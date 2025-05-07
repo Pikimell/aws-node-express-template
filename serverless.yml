@@ -1,0 +1,13 @@
+service: aws-node-express-api
+
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+
+functions:
+  api:
+    handler: src/index.handler
+    events:
+      - httpApi: "*"
