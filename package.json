@@ -1,13 +1,14 @@
 {
   "name": "aws-node-express-template",
   "version": "1.0.0",
-  "description": "",
+  "description": "Aws Node Express Template",
   "scripts": {
     "start": "node src/index.js",
-    "push": "git add . && git commit -m 'update' && git push"
+    "push": "git add . && git commit -m 'update' && git push",
+    "deploy": "sls deploy"
   },
   "keywords": [],
-  "author": "",
+  "author": "Volodymyr Pashchenko",
   "license": "ISC",
   "type": "module",
   "dependencies": {
