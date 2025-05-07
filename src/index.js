@@ -10,6 +10,7 @@ import { parseDevice } from "./middlewares/parseDevice.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 import router from "./routes/index.js";
+import { requestLogger } from "./middlewares/requestLogger.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(initMongoDB);
 
 app.use(parseIP);
 app.use(parseDevice);
+app.use(requestLogger);
 
 app.use(router);
 

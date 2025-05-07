@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Aws Node Express Template",
   "scripts": {
+    "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "push": "git add . && git commit -m 'update' && git push",
     "deploy": "sls deploy"
@@ -21,5 +22,8 @@
     "mongoose": "^8.14.1",
     "serverless-http": "^3.2.0",
     "useragent": "^2.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
