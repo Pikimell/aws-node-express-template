@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
-import { env } from "../utils/env.js";
+
+import {
+  MONGODB_DB,
+  MONGODB_PASSWORD,
+  MONGODB_URL,
+  MONGODB_USER,
+} from "../helpers/constants.js";
 
 let cachedDb = null;
 
@@ -11,10 +17,10 @@ export const initMongoDB = async (req, res, next) => {
   }
 
   try {
-    const user = env("MONGODB_USER");
-    const pwd = env("MONGODB_PASSWORD");
-    const url = env("MONGODB_URL");
-    const db = env("MONGODB_DB");
+    const user = MONGODB_USER;
+    const pwd = MONGODB_PASSWORD;
+    const url = MONGODB_URL;
+    const db = MONGODB_DB;
 
     const connection = await mongoose.connect(
       `mongodb+srv://${user}:${pwd}@${url}/${db}?retryWrites=true&w=majority&ssl=true`

@@ -4,9 +4,7 @@ import { parsPaginationParams } from "../utils/parsParams.js";
 export const getAllNewsController = async (req, res, next) => {
   try {
     const filters = req.query;
-    const pagination = parsPaginationParams(req.query);
-
-    const result = await services.getAllNews({ filters, pagination });
+    const result = await services.getAllNews(filters);
 
     res.status(200).json(result);
   } catch (err) {

@@ -3,9 +3,10 @@ import { calculatePaginationData } from "../utils/calculatePaginationData.js";
 
 // Get all news with pagination and sorting
 export const getAllNews = async ({
-  filters = {},
-  pagination = { page: 1, perPage: 10 },
-  sort = { createdAt: -1 }, // Default sorting by creation date descending
+  page = 1,
+  perPage = 10,
+  sort = { createdAt: -1 },
+  ...filters
 }) => {
   const { page, perPage } = pagination;
   const offset = (page - 1) * perPage;

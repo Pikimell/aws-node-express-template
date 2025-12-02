@@ -30,6 +30,13 @@ export const loginController = async (req, res, next) => {
       maxAge: ONE_MONTH,
     });
 
+    res.cookie("accessToken", session.accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: ONE_DAY,
+    });
+
     res.cookie("sessionId", session.idToken, {
       httpOnly: true,
       secure: true,
@@ -48,6 +55,7 @@ export const logoutController = async (req, res, next) => {
     await authServices.logoutService();
 
     res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
     res.clearCookie("sessionId");
 
     res.status(200).json({ message: "Logged out successfully!" });
@@ -65,6 +73,13 @@ export const refreshController = async (req, res, next) => {
       secure: true,
       sameSite: "Strict",
       maxAge: ONE_MONTH,
+    });
+
+    res.cookie("accessToken", session.accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: ONE_DAY,
     });
 
     res.cookie("sessionId", session.idToken, {

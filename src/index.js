@@ -5,8 +5,6 @@ import cookieParser from "cookie-parser";
 
 import { initMongoDB } from "./database/initMongoDb.js";
 import { printRoutes } from "./helpers/printRoutes.js";
-import { parseIP } from "./middlewares/parseIP.js";
-import { parseDevice } from "./middlewares/parseDevice.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 import router from "./routes/index.js";
@@ -20,8 +18,6 @@ app.use(cookieParser());
 
 app.use(initMongoDB);
 
-app.use(parseIP);
-app.use(parseDevice);
 app.use(requestLogger);
 
 app.use(router);
