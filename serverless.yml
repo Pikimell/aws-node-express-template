@@ -1,6 +1,6 @@
 service: aws-node-express-api
 
-frameworkVersion: "4"
+frameworkVersion: '4'
 
 provider:
   name: aws
@@ -10,4 +10,4 @@ functions:
   api:
     handler: dist/index.handler
     events:
-      - httpApi: "*"
+      - httpApi: '*'
