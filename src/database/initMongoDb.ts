@@ -1,3 +1,4 @@
+import type { RequestHandler } from "express";
 import mongoose from "mongoose";
 
 import {
@@ -7,9 +8,9 @@ import {
   MONGODB_USER,
 } from "../helpers/constants.js";
 
-let cachedDb = null;
+let cachedDb: typeof mongoose | null = null;
 
-export const initMongoDB = async (req, res, next) => {
+export const initMongoDB: RequestHandler = async (_req, _res, next) => {
   if (cachedDb && mongoose.connection.readyState === 1) {
     console.log("Already connected!");
     next();

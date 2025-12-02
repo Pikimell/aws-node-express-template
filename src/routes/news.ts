@@ -1,8 +1,8 @@
-import express from "express";
-import * as newsControllers from "../controllers/newsController.js"; // або newsHandlers.js, якщо так у тебе називається
+import { Router } from "express";
+import * as newsControllers from "../controllers/newsController.js";
 import { ctrlWrapper } from "../utils/ctrlWrapper.js";
 
-const router = express.Router();
+const router = Router();
 
 router.post("/", ctrlWrapper(newsControllers.createNewsController));
 router.get("/", ctrlWrapper(newsControllers.getAllNewsController));

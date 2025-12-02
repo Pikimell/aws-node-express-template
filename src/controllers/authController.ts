@@ -1,9 +1,16 @@
-import { ONE_DAY, ONE_MONTH } from "../helpers/constants.js";
-import * as authServices from "../services/authService.js";
+import { RequestHandler } from "express";
 
-export const registerUserController = async (req, res, next) => {
+
+import * as authServices from "../services/authService.js";
+import { ONE_DAY, ONE_MONTH } from "../helpers/constants.js";
+
+export const registerUserController: RequestHandler = async (req, res, next) => {
   try {
-    const { email, password, group } = req.body;
+    const { email, password, group } = req.body as {
+      email: string;
+      password: string;
+      group?: string;
+    };
 
     const result = await authServices.registerUserService({
       email,
@@ -17,30 +24,30 @@ export const registerUserController = async (req, res, next) => {
   }
 };
 
-export const loginController = async (req, res, next) => {
+export const loginController: RequestHandler = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body as { email: string; password: string };
 
     const session = await authServices.loginService({ email, password });
 
     res.cookie("refreshToken", session.refreshToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_MONTH,
     });
 
     res.cookie("accessToken", session.accessToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_DAY,
     });
 
     res.cookie("sessionId", session.idToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_DAY,
     });
 
@@ -50,7 +57,7 @@ export const loginController = async (req, res, next) => {
   }
 };
 
-export const logoutController = async (req, res, next) => {
+export const logoutController: RequestHandler = async (_req, res, next) => {
   try {
     await authServices.logoutService();
 
@@ -64,28 +71,28 @@ export const logoutController = async (req, res, next) => {
   }
 };
 
-export const refreshController = async (req, res, next) => {
+export const refreshController: RequestHandler = async (_req, res, next) => {
   try {
     const session = await authServices.refreshService();
 
     res.cookie("refreshToken", session.refreshToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_MONTH,
     });
 
     res.cookie("accessToken", session.accessToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_DAY,
     });
 
     res.cookie("sessionId", session.idToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "Strict",
+      sameSite: "strict",
       maxAge: ONE_DAY,
     });
 
@@ -95,9 +102,9 @@ export const refreshController = async (req, res, next) => {
   }
 };
 
-export const requestResetEmailController = async (req, res, next) => {
+export const requestResetEmailController: RequestHandler = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body as { email: string };
     await authServices.requestResetEmailService(email);
     res.status(200).json({ message: "Password reset email sent" });
   } catch (err) {
@@ -105,9 +112,13 @@ export const requestResetEmailController = async (req, res, next) => {
   }
 };
 
-export const resetPasswordController = async (req, res, next) => {
+export const resetPasswordController: RequestHandler = async (req, res, next) => {
   try {
-    const { email, code, newPassword } = req.body;
+    const { email, code, newPassword } = req.body as {
+      email: string;
+      code: string;
+      newPassword: string;
+    };
     await authServices.resetPasswordService({ email, code, newPassword });
     res.status(200).json({ message: "Password successfully reset" });
   } catch (err) {
@@ -115,9 +126,9 @@ export const resetPasswordController = async (req, res, next) => {
   }
 };
 
-export const confirmEmailController = async (req, res, next) => {
+export const confirmEmailController: RequestHandler = async (req, res, next) => {
   try {
-    const { email, code } = req.body;
+    const { email, code } = req.body as { email: string; code: string };
     await authServices.confirmEmailService({ email, code });
     res.status(200).json({ message: "Email confirmed successfully!" });
   } catch (err) {

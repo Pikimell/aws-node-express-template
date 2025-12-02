@@ -1,4 +1,6 @@
-export const requestLogger = (req, res, next) => {
+import type { RequestHandler } from "express";
+
+export const requestLogger: RequestHandler = (req, _res, next) => {
   const method = req.method;
   const url = req.originalUrl;
   const time = new Date().toISOString();

@@ -8,6 +8,6 @@ provider:
 
 functions:
   api:
-    handler: src/index.handler
+    handler: dist/index.handler
     events:
       - httpApi: "*"

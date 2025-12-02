@@ -1,9 +1,23 @@
-export function printRoutes(app, server = "http://localhost:3000") {
+import { Application } from "express";
+
+type RouteLayer = {
+  route?: { path?: string; methods: Record<string, boolean> };
+  name?: string;
+  handle?: { stack?: RouteLayer[] };
+  regexp?: RegExp;
+};
+
+export function printRoutes(app: Application, server = "http://localhost:3000") {
+  const stack: RouteLayer[] | undefined = (app as unknown as { _router?: { stack?: RouteLayer[] } })._router?.stack;
+  if (!stack?.length) {
+    return;
+  }
+
   console.log(`\n🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺 ROUTES 🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺\n`);
 
-  const walk = (stack, prefix = "") => {
-    stack.forEach((layer) => {
-      if (layer.route && layer.route.path) {
+  const walk = (layers: RouteLayer[], prefix = "") => {
+    layers.forEach((layer) => {
+      if (layer.route?.path) {
         const methods = Object.keys(layer.route.methods)
           .map((m) => m.toUpperCase())
           .join(", ")
@@ -22,7 +36,7 @@ export function printRoutes(app, server = "http://localhost:3000") {
     });
   };
 
-  walk(app._router.stack);
+  walk(stack);
 
   console.log(`\n🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻 END ROUTES 🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻\n`);
 }
