@@ -74,3 +74,12 @@ This will start a local emulator of AWS Lambda and tunnel your requests to and f
 Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
 
 When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+
+### Setup AWS CLI
+
+In terminal paste this command:
+```bash
+aws configure --profile yourProfileName
+export AWS_PROFILE = yourProfileName
+npm install serverless -g
+```
