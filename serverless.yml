@@ -6,6 +6,11 @@ provider:
   name: aws
   runtime: nodejs22.x
 
+custom:
+  prune: # автоматичне видалення старих версій
+    automatic: true
+    number: 3 # залишати останні 3 версії
+
 functions:
   api:
     handler: dist/index.handler
