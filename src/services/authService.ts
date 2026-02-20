@@ -39,16 +39,18 @@ const SALT_ROUNDS = 12;
 const REFRESH_TOKEN_VALIDITY = ONE_MONTH;
 
 const createAccessToken = (user: UserDocument) => {
+  const options: jwt.SignOptions = {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+  };
+
   return jwt.sign(
     {
       sub: user._id.toString(),
       email: user.email,
       role: user.role,
     },
-    ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
-    }
+    ACCESS_TOKEN_SECRET as jwt.Secret,
+    options
   );
 };
 

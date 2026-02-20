@@ -9,6 +9,8 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 
 import router from "./routes/index.js";
 import { requestLogger } from "./middlewares/requestLogger.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./docs/swagger.js";
 
 const app = express();
 
@@ -19,6 +21,12 @@ app.use(cookieParser());
 app.use(initMongoDB);
 
 app.use(requestLogger);
+
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get("/docs.json", (_req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 app.use(router);
 
