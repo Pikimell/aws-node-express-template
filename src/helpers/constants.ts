@@ -5,8 +5,8 @@ export const ONE_DAY = ONE_HOUR * 24;
 export const ONE_WEEK = ONE_DAY * 7;
 export const ONE_MONTH = ONE_DAY * 31;
 
-export const USER_POOL_ID = env("COGNITO_USER_POOL_ID");
-export const CLIENT_ID = env("COGNITO_CLIENT_ID");
+export const ACCESS_TOKEN_SECRET = env("JWT_ACCESS_SECRET");
+export const ACCESS_TOKEN_EXPIRES_IN = env("ACCESS_TOKEN_EXPIRES_IN", "1d");
 
 export const MONGODB_USER = env("MONGODB_USER");
 export const MONGODB_PASSWORD = env("MONGODB_PASSWORD");

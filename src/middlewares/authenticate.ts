@@ -1,40 +1,56 @@
-import { CognitoJwtVerifier } from "aws-jwt-verify";
-import type { CognitoAccessTokenPayload } from "aws-jwt-verify/jwt-model";
+import jwt from "jsonwebtoken";
 import createHttpError from "http-errors";
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 
-import { CLIENT_ID, USER_POOL_ID } from "../helpers/constants.js";
-import { getUserByCognito } from "../services/userService.js";
+import { ACCESS_TOKEN_SECRET } from "../helpers/constants.js";
+import { getUserById } from "../services/userService.js";
 
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: USER_POOL_ID,
-  tokenUse: "access",
-  clientId: CLIENT_ID,
-});
+type AccessTokenPayload = jwt.JwtPayload & {
+  sub: string;
+  email: string;
+  role?: string;
+};
+
+const resolveTokenFromRequest = (req: Request): string | null => {
+  if (req.cookies?.accessToken) {
+    return req.cookies.accessToken;
+  }
+
+  const bearerHeader = req.headers["authorization"] ?? req.headers["auth-bearer"];
+
+  if (!bearerHeader) {
+    return null;
+  }
+
+  const headerValue = Array.isArray(bearerHeader) ? bearerHeader[0] : bearerHeader;
+  const [scheme, token] = headerValue.split(" ");
+
+  if (!scheme || !token || scheme.toLowerCase() !== "bearer") {
+    return null;
+  }
+
+  return token;
+};
 
 export const authenticate: RequestHandler = async (req, _res, next) => {
   try {
-    const authHeader = req.headers["authorization"];
+    const token = resolveTokenFromRequest(req);
 
-    if (!authHeader) {
-      return next(createHttpError(401, "Please provide Authorization header"));
+    if (!token) {
+      return next(createHttpError(401, "Access token is missing"));
     }
 
-    const [bearer, token] = authHeader.split(" ");
-
-    if (bearer !== "Bearer" || !token) {
-      return next(createHttpError(401, "Auth header should be of type Bearer"));
-    }
-
-    const payload = (await verifier.verify(token)) as CognitoAccessTokenPayload;
-    const user = await getUserByCognito(payload.sub);
+    const payload = jwt.verify(token, ACCESS_TOKEN_SECRET) as AccessTokenPayload;
+    const user = await getUserById(payload.sub);
 
     req.user = user;
-    req.typeAccount = payload["cognito:groups"]?.[0] ?? null;
+    req.typeAccount = payload.role ?? null;
 
     next();
   } catch (err) {
-    console.error("JWT Verification error:", err);
-    return next(createHttpError(401, "Invalid token"));
+    if (err instanceof jwt.JsonWebTokenError) {
+      return next(createHttpError(401, "Invalid access token"));
+    }
+    next(err);
   }
 };
