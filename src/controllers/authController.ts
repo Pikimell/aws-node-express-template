@@ -1,4 +1,5 @@
 import { RequestHandler } from "express";
+import createHttpError from "http-errors";
 
 import * as authServices from "../services/authService.js";
 import { ONE_DAY, ONE_MONTH } from "../helpers/constants.js";
@@ -54,6 +55,18 @@ export const loginController: RequestHandler = async (req, res, next) => {
     });
 
     res.status(200).json({ accessToken: tokens.accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getCurrentUserController: RequestHandler = (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw createHttpError(401, "User is not authenticated");
+    }
+
+    res.status(200).json({ user: req.user });
   } catch (err) {
     next(err);
   }
