@@ -1,194 +1,199 @@
-# AWS Node Express Template
+# EventBridge Scheduler для Express API на AWS Lambda
 
-TypeScript API на Express для запуску локально як звичайний HTTP-сервер і для деплою в AWS Lambda через Serverless Framework. Проєкт працює з MongoDB через Mongoose, має JWT-автентифікацію, HTTP-only cookie для токенів, сесії з refresh token, CRUD-операції для новин і Swagger-документацію.
+Цей проєкт показує шаблон, у якому Express API створює розклади в AWS EventBridge Scheduler, а Scheduler у потрібний час викликає окрему callback Lambda з payload, який був переданий під час створення розкладу.
 
-## Що реалізовано
+## Як це працює
 
-- Express API з TypeScript та ESM-модулями.
-- Підключення до MongoDB Atlas через Mongoose.
-- Реєстрація, логін, logout, refresh token і отримання поточного користувача.
-- Хешування паролів через `bcryptjs`.
-- Access token через JWT та refresh token у колекції `sessions`.
-- HTTP-only cookie `accessToken` і `refreshToken`.
-- Валідація запитів через `celebrate`/`Joi`.
-- Колекція `news` з додаванням, отриманням списку та видаленням новин.
-- Пагінація, сортування і фільтрація новин.
-- Swagger UI на `/docs` і OpenAPI JSON на `/docs.json`.
-- Обгортка `serverless-http` для запуску Express у AWS Lambda.
-- `serverless.yml` з одним Lambda handler для всіх HTTP API route.
+Потік для одноразового нагадування:
 
-## Основні маршрути
+1. Клієнт викликає `POST /schedules/once`.
+2. Express Lambda створює EventBridge Scheduler schedule через AWS SDK.
+3. Scheduler чекає до вказаного `runAt`.
+4. Scheduler викликає callback Lambda.
+5. Callback Lambda отримує переданий раніше `payload` і виводить його в CloudWatch Logs.
+6. Одноразовий schedule автоматично видаляється після виконання через `ActionAfterCompletion: DELETE`.
 
-### Auth
+Потік для повторюваного нагадування:
 
-- `POST /auth/register` - реєстрація користувача.
-- `POST /auth/login` - логін, створення сесії та встановлення cookie з токенами.
-- `POST /auth/logout` - видалення refresh token сесії.
-- `POST /auth/refresh` - ротація refresh token і видача нового access token.
-- `GET /auth/me` - дані поточного користувача, потрібен Bearer access token.
+1. Клієнт викликає `POST /schedules/recurring`.
+2. Express Lambda створює EventBridge Scheduler schedule з `rate(...)`, `cron(...)` або шаблонною частотою.
+3. Scheduler викликає callback Lambda за розкладом.
+4. Callback Lambda кожного разу отримує той самий `payload`.
 
-### News
+## Що створює `serverless.yml`
 
-- `GET /news` - список новин.
-- `POST /news` - створення новини.
-- `DELETE /news/:newsId` - видалення новини за MongoDB ObjectId.
+`serverless.yml` описує такі ресурси:
 
-### Schedules
+- `api` Lambda - основна Express Lambda, яка приймає HTTP запити.
+- `scheduleCallback` Lambda - окрема callback Lambda, яку викликає EventBridge Scheduler.
+- `SchedulerInvokeLambdaRole` - IAM role, яку EventBridge Scheduler використовує для виклику callback Lambda.
+- IAM permissions для `api` Lambda:
+  - `scheduler:CreateSchedule` - дозволяє створювати schedules.
+  - `iam:PassRole` - дозволяє передати `SchedulerInvokeLambdaRole` у target Scheduler.
 
-- `POST /schedules/once` - створення одноразового виклику callback Lambda через EventBridge Scheduler.
-- `POST /schedules/recurring` - створення повторюваного виклику callback Lambda через EventBridge Scheduler.
-
-Параметри для `GET /news`:
-
-- `page` - номер сторінки, за замовчуванням `1`.
-- `perPage` - кількість елементів, за замовчуванням `10`, максимум `100`.
-- `sortField` - `createdAt`, `updatedAt`, `topic`, `type` або `typeAccount`.
-- `sortOrder` - `asc` або `desc`.
-- `topic` - пошук по темі без урахування регістру.
-- `type` - `updates`, `news`, `testimonials` або `video stories`.
-- `typeAccount` - `freeUser`, `paidUser` або `agencyUser`.
-- `userId` - фільтр за користувачем.
-
-## Необхідні налаштування
-
-Потрібні:
-
-- Node.js 22 або сумісна версія.
-- npm.
-- MongoDB Atlas або інший MongoDB cluster з connection string у форматі `mongodb+srv`.
-- Для деплою: AWS CLI, Serverless Framework v4 і налаштований AWS profile.
-
-Створіть `.env` у корені проєкту:
-
-```env
-PORT=3000
-NODE_ENV=development
-
-MONGODB_USER=yourMongoUser
-MONGODB_PASSWORD=yourMongoPassword
-MONGODB_URL=your-cluster.mongodb.net
-MONGODB_DB=yourDatabaseName
-
-JWT_ACCESS_SECRET=yourStrongAccessTokenSecret
-ACCESS_TOKEN_EXPIRES_IN=1d
-```
-
-`PORT`, `NODE_ENV` і `ACCESS_TOKEN_EXPIRES_IN` не є обов'язковими для старту, але їх варто задавати явно. MongoDB змінні та `JWT_ACCESS_SECRET` обов'язкові.
-
-Підключення до MongoDB формується так:
+Після деплою Serverless автоматично прокидає в `api` Lambda змінні:
 
 ```text
-mongodb+srv://MONGODB_USER:MONGODB_PASSWORD@MONGODB_URL/MONGODB_DB?retryWrites=true&w=majority&ssl=true
+SCHEDULE_CALLBACK_LAMBDA_ARN
+SCHEDULER_ROLE_ARN
 ```
 
-## Запуск локально
+Вони потрібні сервісу `src/services/scheduleService.ts`, щоб знати яку Lambda викликати і з якою IAM role.
 
-Встановіть залежності:
-
-```bash
-npm install
-```
-
-Запустіть dev-сервер:
-
-```bash
-npm run dev
-```
-
-За замовчуванням API буде доступне на:
+## Основні файли
 
 ```text
-http://localhost:3000
+serverless.yml
+src/routes/schedules.ts
+src/controllers/scheduleController.ts
+src/services/scheduleService.ts
+src/validations/schedule.ts
+src/functions/scheduleCallback.ts
 ```
 
-Swagger:
+`src/functions/scheduleCallback.ts` зараз є шаблонною callback функцією:
+
+```ts
+export const handler = async (event: unknown) => {
+  console.log("Scheduled callback payload:", JSON.stringify(event, null, 2));
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: "Scheduled callback executed",
+    }),
+  };
+};
+```
+
+Тут можна замінити `console.log` на реальну логіку: відправку email, push notification, webhook, запис у базу або будь-яку іншу дію.
+
+## Endpoints
+
+### Одноразовий виклик
+
+```http
+POST /schedules/once
+```
+
+Body:
+
+```json
+{
+  "runAt": "2026-08-09T12:30:00Z",
+  "payload": {
+    "message": "Hello once"
+  }
+}
+```
+
+`runAt` має бути ISO date у майбутньому. Сервіс конвертує його у Scheduler expression:
 
 ```text
-http://localhost:3000/docs
+at(2026-08-09T12:30:00)
 ```
 
-OpenAPI JSON:
-
-```text
-http://localhost:3000/docs.json
-```
-
-## Приклади запитів
-
-Реєстрація:
+Приклад:
 
 ```bash
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123","nickname":"User"}'
-```
-
-Логін:
-
-```bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-```
-
-Створення новини:
-
-```bash
-curl -X POST http://localhost:3000/news \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"user-id","type":"news","typeAccount":"freeUser","topic":"Release","text":"News text","files":[]}'
-```
-
-Одноразове нагадування:
-
-```bash
-curl -X POST http://localhost:3000/schedules/once \
+curl -X POST https://your-api-url/schedules/once \
   -H "Content-Type: application/json" \
   -d '{"runAt":"2026-08-09T12:30:00Z","payload":{"message":"Hello once"}}'
 ```
 
-Повторюване нагадування через шаблонну частоту:
+### Повторюваний виклик
+
+```http
+POST /schedules/recurring
+```
+
+Можна передати або `frequency`, або `expression`. Не можна передавати обидва одночасно.
+
+Body з шаблонною частотою:
+
+```json
+{
+  "frequency": "daily",
+  "payload": {
+    "message": "Hello daily"
+  }
+}
+```
+
+Дозволені значення `frequency`:
+
+```text
+daily
+weekly
+```
+
+Вони перетворюються так:
+
+```text
+daily  -> rate(1 day)
+weekly -> rate(1 week)
+```
+
+Body з власним Scheduler expression:
+
+```json
+{
+  "expression": "rate(1 week)",
+  "payload": {
+    "message": "Hello weekly"
+  }
+}
+```
+
+Дозволені формати `expression`:
+
+```text
+rate(1 minute)
+rate(5 minutes)
+rate(1 hour)
+rate(6 hours)
+rate(1 day)
+rate(3 days)
+rate(1 week)
+rate(2 weeks)
+cron(0 12 ? * MON *)
+```
+
+Валідація дозволяє:
+
+- `rate(...)` з одиницями `minute(s)`, `hour(s)`, `day(s)`, `week(s)`.
+- `cron(...)` у форматі EventBridge Scheduler cron expression.
+
+Приклад:
 
 ```bash
-curl -X POST http://localhost:3000/schedules/recurring \
+curl -X POST https://your-api-url/schedules/recurring \
   -H "Content-Type: application/json" \
-  -d '{"frequency":"daily","payload":{"message":"Hello daily"}}'
+  -d '{"expression":"cron(0 12 ? * MON *)","payload":{"message":"Every Monday at 12:00 UTC"}}'
 ```
 
-Повторюване нагадування через EventBridge Scheduler expression:
+## Налаштування AWS
 
-```bash
-curl -X POST http://localhost:3000/schedules/recurring \
-  -H "Content-Type: application/json" \
-  -d '{"expression":"rate(1 week)","payload":{"message":"Hello weekly"}}'
-```
+Потрібні:
 
-Для `frequency` дозволено `daily` або `weekly`. Для `expression` дозволено `rate(...)` з одиницями `minute(s)`, `hour(s)`, `day(s)`, `week(s)` або `cron(...)`.
+- AWS account.
+- AWS CLI з налаштованим profile.
+- Serverless Framework v4.
+- Node.js 22 або сумісна версія.
+- npm dependencies з `package-lock.json`.
 
-Schedule endpoints створюють реальні EventBridge Scheduler schedules, тому для роботи потрібні AWS credentials і змінні Lambda, які задаються через `serverless.yml` після деплою.
-
-Отримання новин:
-
-```bash
-curl "http://localhost:3000/news?page=1&perPage=10&sortField=createdAt&sortOrder=desc"
-```
-
-## Деплой в AWS
-
-Встановіть Serverless Framework, якщо він ще не встановлений:
-
-```bash
-npm install -g serverless
-```
-
-Налаштуйте AWS profile:
+Налаштування AWS profile:
 
 ```bash
 aws configure --profile yourProfileName
 export AWS_PROFILE=yourProfileName
 ```
 
-Перед деплоєм переконайтесь, що production environment variables доступні для Lambda. Поточний `serverless.yml` описує сервіс `aws-node-express-api`, runtime `nodejs22.x` і handler `dist/index.handler`.
+Встановлення залежностей:
+
+```bash
+npm install
+```
 
 Деплой:
 
@@ -196,26 +201,75 @@ export AWS_PROFILE=yourProfileName
 npm run deploy
 ```
 
-Команда `deploy` компілює TypeScript у `dist` і запускає `sls deploy`.
+`npm run deploy` запускає `npm run build`, а потім `sls deploy`.
 
-## Корисні команди
+## Що важливо знати
 
-- `npm run dev` - локальний запуск через `nodemon` і `ts-node`.
-- `npm run build` - компіляція TypeScript у `dist`.
-- `npm start` - build і запуск `dist/index.js`.
-- `npm run deploy` - build і деплой через Serverless Framework.
+EventBridge Scheduler не викликає HTTP endpoint. Він викликає AWS target напряму. У цьому шаблоні target - це callback Lambda `scheduleCallback`.
 
-## Структура проєкту
+Payload, який передається в endpoint, зберігається в schedule target як `Input`. Коли Scheduler викликає Lambda, цей JSON приходить у Lambda як `event`.
+
+Одноразові schedules створюються з:
+
+```ts
+ActionAfterCompletion: "DELETE"
+```
+
+Тому після успішного одноразового виклику вони не залишаються в Scheduler.
+
+Повторювані schedules не видаляються автоматично. Для production сценарію зазвичай потрібно додати окремі endpoints для:
+
+- перегляду schedules;
+- вимкнення schedule;
+- видалення schedule;
+- оновлення schedule;
+- збереження schedule name у базі даних.
+
+## Локальний запуск
+
+Локально Express API можна запустити так:
+
+```bash
+npm run dev
+```
+
+API буде доступне на:
 
 ```text
-src/
-  controllers/   HTTP controllers
-  database/      Mongoose models і MongoDB init middleware
-  docs/          Swagger/OpenAPI конфіг
-  helpers/       константи та допоміжні функції
-  middlewares/   auth, logger, error handler
-  routes/        Express routers
-  services/      бізнес-логіка
-  utils/         env, pagination, query parsing
-  validations/   celebrate/Joi schemas
+http://localhost:3000
+```
+
+Але schedule endpoints створюють реальні AWS schedules. Для локальної перевірки цих endpoints потрібні:
+
+- AWS credentials у середовищі;
+- `SCHEDULE_CALLBACK_LAMBDA_ARN`;
+- `SCHEDULER_ROLE_ARN`;
+- вже задеплоєна callback Lambda.
+
+Без цих значень локальний API не зможе створити schedule.
+
+## Де налаштовувати під себе
+
+Callback логіку змінювати тут:
+
+```text
+src/functions/scheduleCallback.ts
+```
+
+Валідацію request body змінювати тут:
+
+```text
+src/validations/schedule.ts
+```
+
+Створення Scheduler schedules змінювати тут:
+
+```text
+src/services/scheduleService.ts
+```
+
+IAM permissions, Lambda resources і environment variables змінювати тут:
+
+```text
+serverless.yml
 ```
