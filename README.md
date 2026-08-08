@@ -1,85 +1,188 @@
-<!--
-title: 'Serverless Framework Node Express API on AWS'
-description: 'This template demonstrates how to develop and deploy a simple Node Express API running on AWS Lambda using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-priority: 1
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# AWS Node Express Template
 
-# Serverless Framework Node Express API on AWS
+TypeScript API на Express для запуску локально як звичайний HTTP-сервер і для деплою в AWS Lambda через Serverless Framework. Проєкт працює з MongoDB через Mongoose, має JWT-автентифікацію, HTTP-only cookie для токенів, сесії з refresh token, CRUD-операції для новин і Swagger-документацію.
 
-This template demonstrates how to develop and deploy a simple Node Express API service running on AWS Lambda using the Serverless Framework.
+## Що реалізовано
 
-This template configures a single function, `api`, which is responsible for handling all incoming requests using the `httpApi` event. To learn more about `httpApi` event configuration options, please refer to [httpApi event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/). As the event is configured in a way to accept all incoming requests, the Express.js framework is responsible for routing and handling requests internally. This implementation uses the `serverless-http` package to transform the incoming event request payloads to payloads compatible with Express.js. To learn more about `serverless-http`, please refer to the [serverless-http README](https://github.com/dougmoscrop/serverless-http).
+- Express API з TypeScript та ESM-модулями.
+- Підключення до MongoDB Atlas через Mongoose.
+- Реєстрація, логін, logout, refresh token і отримання поточного користувача.
+- Хешування паролів через `bcryptjs`.
+- Access token через JWT та refresh token у колекції `sessions`.
+- HTTP-only cookie `accessToken` і `refreshToken`.
+- Валідація запитів через `celebrate`/`Joi`.
+- Колекція `news` з додаванням, отриманням списку та видаленням новин.
+- Пагінація, сортування і фільтрація новин.
+- Swagger UI на `/docs` і OpenAPI JSON на `/docs.json`.
+- Обгортка `serverless-http` для запуску Express у AWS Lambda.
+- `serverless.yml` з одним Lambda handler для всіх HTTP API route.
 
-## Usage
+## Основні маршрути
 
-### Deployment
+### Auth
 
-Install dependencies with:
+- `POST /auth/register` - реєстрація користувача.
+- `POST /auth/login` - логін, створення сесії та встановлення cookie з токенами.
+- `POST /auth/logout` - видалення refresh token сесії.
+- `POST /auth/refresh` - ротація refresh token і видача нового access token.
+- `GET /auth/me` - дані поточного користувача, потрібен Bearer access token.
 
+### News
+
+- `GET /news` - список новин.
+- `POST /news` - створення новини.
+- `DELETE /news/:newsId` - видалення новини за MongoDB ObjectId.
+
+Параметри для `GET /news`:
+
+- `page` - номер сторінки, за замовчуванням `1`.
+- `perPage` - кількість елементів, за замовчуванням `10`, максимум `100`.
+- `sortField` - `createdAt`, `updatedAt`, `topic`, `type` або `typeAccount`.
+- `sortOrder` - `asc` або `desc`.
+- `topic` - пошук по темі без урахування регістру.
+- `type` - `updates`, `news`, `testimonials` або `video stories`.
+- `typeAccount` - `freeUser`, `paidUser` або `agencyUser`.
+- `userId` - фільтр за користувачем.
+
+## Необхідні налаштування
+
+Потрібні:
+
+- Node.js 22 або сумісна версія.
+- npm.
+- MongoDB Atlas або інший MongoDB cluster з connection string у форматі `mongodb+srv`.
+- Для деплою: AWS CLI, Serverless Framework v4 і налаштований AWS profile.
+
+Створіть `.env` у корені проєкту:
+
+```env
+PORT=3000
+NODE_ENV=development
+
+MONGODB_USER=yourMongoUser
+MONGODB_PASSWORD=yourMongoPassword
+MONGODB_URL=your-cluster.mongodb.net
+MONGODB_DB=yourDatabaseName
+
+JWT_ACCESS_SECRET=yourStrongAccessTokenSecret
+ACCESS_TOKEN_EXPIRES_IN=1d
 ```
+
+`PORT`, `NODE_ENV` і `ACCESS_TOKEN_EXPIRES_IN` не є обов'язковими для старту, але їх варто задавати явно. MongoDB змінні та `JWT_ACCESS_SECRET` обов'язкові.
+
+Підключення до MongoDB формується так:
+
+```text
+mongodb+srv://MONGODB_USER:MONGODB_PASSWORD@MONGODB_URL/MONGODB_DB?retryWrites=true&w=majority&ssl=true
+```
+
+## Запуск локально
+
+Встановіть залежності:
+
+```bash
 npm install
 ```
 
-and then deploy with:
+Запустіть dev-сервер:
 
-```
-serverless deploy
-```
-
-After running deploy, you should see output similar to:
-
-```
-Deploying "aws-node-express-api" to stage "dev" (us-east-1)
-
-✔ Service deployed to stack aws-node-express-api-dev (96s)
-
-endpoint: ANY - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com
-functions:
-  api: aws-node-express-api-dev-api (2.3 kB)
+```bash
+npm run dev
 ```
 
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [`httpApi` event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/).
+За замовчуванням API буде доступне на:
 
-### Invocation
-
-After successful deployment, you can call the created application via HTTP:
-
-```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
+```text
+http://localhost:3000
 ```
 
-Which should result in the following response:
+Swagger:
 
-```json
-{ "message": "Hello from root!" }
+```text
+http://localhost:3000/docs
 ```
 
-### Local development
+OpenAPI JSON:
 
-The easiest way to develop and test your function is to use the `dev` command:
-
-```
-serverless dev
+```text
+http://localhost:3000/docs.json
 ```
 
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
+## Приклади запитів
 
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
+Реєстрація:
 
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123","nickname":"User"}'
+```
 
-### Setup AWS CLI
+Логін:
 
-In terminal paste this command:
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+Створення новини:
+
+```bash
+curl -X POST http://localhost:3000/news \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-id","type":"news","typeAccount":"freeUser","topic":"Release","text":"News text","files":[]}'
+```
+
+Отримання новин:
+
+```bash
+curl "http://localhost:3000/news?page=1&perPage=10&sortField=createdAt&sortOrder=desc"
+```
+
+## Деплой в AWS
+
+Встановіть Serverless Framework, якщо він ще не встановлений:
+
+```bash
+npm install -g serverless
+```
+
+Налаштуйте AWS profile:
+
 ```bash
 aws configure --profile yourProfileName
-export AWS_PROFILE = yourProfileName
-npm install serverless -g
+export AWS_PROFILE=yourProfileName
+```
+
+Перед деплоєм переконайтесь, що production environment variables доступні для Lambda. Поточний `serverless.yml` описує сервіс `aws-node-express-api`, runtime `nodejs22.x` і handler `dist/index.handler`.
+
+Деплой:
+
+```bash
+npm run deploy
+```
+
+Команда `deploy` компілює TypeScript у `dist` і запускає `sls deploy`.
+
+## Корисні команди
+
+- `npm run dev` - локальний запуск через `nodemon` і `ts-node`.
+- `npm run build` - компіляція TypeScript у `dist`.
+- `npm start` - build і запуск `dist/index.js`.
+- `npm run deploy` - build і деплой через Serverless Framework.
+
+## Структура проєкту
+
+```text
+src/
+  controllers/   HTTP controllers
+  database/      Mongoose models і MongoDB init middleware
+  docs/          Swagger/OpenAPI конфіг
+  helpers/       константи та допоміжні функції
+  middlewares/   auth, logger, error handler
+  routes/        Express routers
+  services/      бізнес-логіка
+  utils/         env, pagination, query parsing
+  validations/   celebrate/Joi schemas
 ```
