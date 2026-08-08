@@ -2,6 +2,7 @@ import express from "express";
 import serverless from "serverless-http";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { errors } from "celebrate";
 
 import { initMongoDB } from "./database/initMongoDb.js";
 import { printRoutes } from "./helpers/printRoutes.js";
@@ -30,6 +31,7 @@ app.get("/docs.json", (_req, res) => {
 
 app.use(router);
 
+app.use(errors());
 app.use(errorHandler);
 
 printRoutes(app);
