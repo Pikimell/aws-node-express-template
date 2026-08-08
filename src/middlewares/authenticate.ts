@@ -15,15 +15,13 @@ const verifier = CognitoJwtVerifier.create({
 export const authenticate: RequestHandler = async (req, _res, next) => {
   try {
     const authHeader = req.headers["authorization"];
+    const cookieToken = req.cookies?.accessToken;
 
-    if (!authHeader) {
-      return next(createHttpError(401, "Please provide Authorization header"));
-    }
+    const [bearer, headerToken] = authHeader?.split(" ") ?? [];
+    const token = bearer === "Bearer" ? headerToken : cookieToken;
 
-    const [bearer, token] = authHeader.split(" ");
-
-    if (bearer !== "Bearer" || !token) {
-      return next(createHttpError(401, "Auth header should be of type Bearer"));
+    if (!token) {
+      return next(createHttpError(401, "Please provide access token"));
     }
 
     const payload = (await verifier.verify(token)) as CognitoAccessTokenPayload;
@@ -37,4 +35,14 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
     console.error("JWT Verification error:", err);
     return next(createHttpError(401, "Invalid token"));
   }
+};
+
+export const authorizeRoles = (...roles: string[]): RequestHandler => {
+  return (req, _res, next) => {
+    if (!req.typeAccount || !roles.includes(req.typeAccount)) {
+      return next(createHttpError(403, "Forbidden"));
+    }
+
+    next();
+  };
 };

@@ -1,21 +1,20 @@
 import { RequestHandler } from "express";
-
+import createHttpError from "http-errors";
 
 import * as authServices from "../services/authService.js";
-import { ONE_DAY, ONE_MONTH } from "../helpers/constants.js";
+import { clearAuthCookies, setAuthCookies } from "../utils/authCookies.js";
+import { getRequestAccessToken, getRequestRefreshToken } from "../utils/authTokens.js";
 
 export const registerUserController: RequestHandler = async (req, res, next) => {
   try {
-    const { email, password, group } = req.body as {
+    const { email, password } = req.body as {
       email: string;
       password: string;
-      group?: string;
     };
 
     const result = await authServices.registerUserService({
       email,
       password,
-      group,
     });
 
     res.status(201).json(result);
@@ -30,26 +29,7 @@ export const loginController: RequestHandler = async (req, res, next) => {
 
     const session = await authServices.loginService({ email, password });
 
-    res.cookie("refreshToken", session.refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_MONTH,
-    });
-
-    res.cookie("accessToken", session.accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_DAY,
-    });
-
-    res.cookie("sessionId", session.idToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_DAY,
-    });
+    setAuthCookies(res, session);
 
     res.status(200).json({ accessToken: session.accessToken });
   } catch (err) {
@@ -57,13 +37,11 @@ export const loginController: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const logoutController: RequestHandler = async (_req, res, next) => {
+export const logoutController: RequestHandler = async (req, res, next) => {
   try {
-    await authServices.logoutService();
+    await authServices.logoutService(getRequestAccessToken(req));
 
-    res.clearCookie("refreshToken");
-    res.clearCookie("accessToken");
-    res.clearCookie("sessionId");
+    clearAuthCookies(res);
 
     res.status(200).json({ message: "Logged out successfully!" });
   } catch (err) {
@@ -71,30 +49,17 @@ export const logoutController: RequestHandler = async (_req, res, next) => {
   }
 };
 
-export const refreshController: RequestHandler = async (_req, res, next) => {
+export const refreshController: RequestHandler = async (req, res, next) => {
   try {
-    const session = await authServices.refreshService();
+    const refreshToken = getRequestRefreshToken(req);
 
-    res.cookie("refreshToken", session.refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_MONTH,
-    });
+    if (!refreshToken) {
+      throw createHttpError(401, "Please provide refresh token");
+    }
 
-    res.cookie("accessToken", session.accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_DAY,
-    });
+    const session = await authServices.refreshService(refreshToken);
 
-    res.cookie("sessionId", session.idToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: ONE_DAY,
-    });
+    setAuthCookies(res, session);
 
     res.status(200).json({ accessToken: session.accessToken });
   } catch (err) {

@@ -5,6 +5,26 @@ frameworkVersion: '4'
 provider:
   name: aws
   runtime: nodejs22.x
+  stage: ${opt:stage, 'dev'}
+  environment:
+    COGNITO_USER_POOL_ID:
+      Ref: CognitoUserPool
+    COGNITO_CLIENT_ID:
+      Ref: CognitoUserPoolClient
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - cognito-idp:AdminAddUserToGroup
+            - cognito-idp:AdminDeleteUser
+            - cognito-idp:AdminDisableUser
+            - cognito-idp:AdminEnableUser
+            - cognito-idp:GlobalSignOut
+          Resource:
+            Fn::GetAtt:
+              - CognitoUserPool
+              - Arn
 
 custom:
   prune: # автоматичне видалення старих версій
@@ -16,3 +36,77 @@ functions:
     handler: dist/index.handler
     events:
       - httpApi: '*'
+
+resources:
+  Resources:
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${self:provider.stage}-user-pool
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            RequireUppercase: true
+            TemporaryPasswordValidityDays: 7
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            Mutable: true
+            Required: true
+        VerificationMessageTemplate:
+          DefaultEmailOption: CONFIRM_WITH_CODE
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-${self:provider.stage}-client
+        UserPoolId:
+          Ref: CognitoUserPool
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_USER_PASSWORD_AUTH
+        PreventUserExistenceErrors: ENABLED
+        AccessTokenValidity: 1
+        IdTokenValidity: 1
+        RefreshTokenValidity: 30
+        TokenValidityUnits:
+          AccessToken: hours
+          IdToken: hours
+          RefreshToken: days
+        RefreshTokenRotation:
+          Feature: ENABLED
+          RetryGracePeriodSeconds: 10
+
+    CognitoUserGroupUser:
+      Type: AWS::Cognito::UserPoolGroup
+      Properties:
+        GroupName: user
+        UserPoolId:
+          Ref: CognitoUserPool
+
+    CognitoUserGroupAdmin:
+      Type: AWS::Cognito::UserPoolGroup
+      Properties:
+        GroupName: admin
+        UserPoolId:
+          Ref: CognitoUserPool
+
+  Outputs:
+    CognitoUserPoolId:
+      Value:
+        Ref: CognitoUserPool
+    CognitoUserPoolClientId:
+      Value:
+        Ref: CognitoUserPoolClient

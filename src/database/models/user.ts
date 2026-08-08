@@ -12,10 +12,6 @@ const userSchema = new Schema(
       required: true,
       unique: true,
     },
-    password: {
-      type: String,
-      required: true,
-    },
   },
   {
     versionKey: false,
@@ -26,8 +22,7 @@ export type User = InferSchemaType<typeof userSchema>;
 export type UserDocument = HydratedDocument<User>;
 
 userSchema.methods.toJSON = function (this: UserDocument) {
-  const { password, ...rest } = this.toObject();
-  return rest;
+  return this.toObject();
 };
 
 export const UserCollection = model<User>("users", userSchema);

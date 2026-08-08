@@ -1,0 +1,6 @@
+(2026-08-08) - Додали створення Cognito User Pool, App Client, груп user/admin та IAM права для авторизації через serverless.yml (feat: add cognito serverless resources)
+(2026-08-08) - Оновили приклад env змінних для локального Cognito налаштування (docs: update env example)
+(2026-08-08) - Посилили логіку авторизації: прибрали збереження паролів, закрили вибір групи під час реєстрації, оновили refresh/logout та захистили admin routes (fix: harden cognito auth flow)
+(2026-08-08) - Перенесли валідацію запитів auth/news на celebrate schemas з використанням Segments (refactor: use celebrate request validation)
+(2026-08-08) - Структурували авторизацію: винесли helpers для cookies/tokens та перевели Cognito auth service на AWS SDK без browser SDK (refactor: restructure cognito auth service)
+(2026-08-08) - Увімкнули Cognito refresh token rotation та перевели refresh flow на GetTokensFromRefreshToken через AWS SDK v3 (feat: add refresh token rotation)
