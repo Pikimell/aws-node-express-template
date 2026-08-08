@@ -5,8 +5,19 @@ frameworkVersion: '4'
 provider:
   name: aws
   runtime: nodejs22.x
+  environment:
+    FILES_BUCKET_NAME: ${self:custom.filesBucketName}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::${self:custom.filesBucketName}/*
 
 custom:
+  filesBucketName: ${self:service}-${sls:stage}-${aws:accountId}-files
   prune: # автоматичне видалення старих версій
     automatic: true
     number: 3 # залишати останні 3 версії
@@ -16,3 +27,42 @@ functions:
     handler: dist/index.handler
     events:
       - httpApi: '*'
+
+resources:
+  Resources:
+    FilesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.filesBucketName}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - '*'
+              AllowedMethods:
+                - GET
+                - HEAD
+                - PUT
+              AllowedHeaders:
+                - '*'
+              ExposedHeaders:
+                - ETag
+              MaxAge: 3000
+    FilesBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref FilesBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: PublicReadFiles
+              Effect: Allow
+              Principal: '*'
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub '${FilesBucket.Arn}/*'

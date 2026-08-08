@@ -69,6 +69,56 @@ const swaggerDefinition = {
           },
         },
       },
+      File: {
+        type: "object",
+        properties: {
+          _id: { type: "string" },
+          userId: { type: "string" },
+          name: { type: "string" },
+          url: { type: "string", format: "uri" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      FileInput: {
+        type: "object",
+        properties: {
+          userId: { type: "string" },
+          name: { type: "string" },
+          url: { type: "string", format: "uri" },
+        },
+        required: ["userId", "name", "url"],
+      },
+      FileUploadSignedUrlInput: {
+        type: "object",
+        properties: {
+          fileName: { type: "string" },
+          contentType: { type: "string" },
+        },
+        required: ["fileName"],
+      },
+      FileUploadSignedUrlResponse: {
+        type: "object",
+        properties: {
+          uploadSignedUrl: { type: "string", format: "uri" },
+          publicUrl: { type: "string", format: "uri" },
+        },
+      },
+      FilesListResponse: {
+        type: "object",
+        properties: {
+          page: { type: "number" },
+          perPage: { type: "number" },
+          totalItems: { type: "number" },
+          totalPages: { type: "number" },
+          hasPreviousPage: { type: "boolean" },
+          hasNextPage: { type: "boolean" },
+          files: {
+            type: "array",
+            items: { $ref: "#/components/schemas/File" },
+          },
+        },
+      },
     },
   },
   paths: {
@@ -177,6 +227,138 @@ const swaggerDefinition = {
           },
           "401": {
             description: "Токен не надано або недійсний",
+          },
+        },
+      },
+    },
+    "/files": {
+      get: {
+        tags: ["Files"],
+        summary: "Отримати список файлів",
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+          { name: "perPage", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          { name: "sortField", in: "query", schema: { type: "string", enum: ["createdAt", "updatedAt", "name", "url"] } },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"] } },
+          { name: "name", in: "query", schema: { type: "string" } },
+          { name: "url", in: "query", schema: { type: "string" } },
+          { name: "userId", in: "query", schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "Список файлів",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/FilesListResponse" },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Files"],
+        summary: "Створити файл",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/FileInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Файл створено",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/File" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/files/upload-url": {
+      post: {
+        tags: ["Files"],
+        summary: "Отримати signed URL для прямого завантаження файлу в S3",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/FileUploadSignedUrlInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "URL для завантаження та публічний URL файлу",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/FileUploadSignedUrlResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/files/{fileId}": {
+      get: {
+        tags: ["Files"],
+        summary: "Отримати файл за ID",
+        parameters: [
+          { name: "fileId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "Дані файлу",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/File" },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        tags: ["Files"],
+        summary: "Оновити файл",
+        parameters: [
+          { name: "fileId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/FileInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Файл оновлено",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/File" },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["Files"],
+        summary: "Видалити файл",
+        parameters: [
+          { name: "fileId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "Файл видалено",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/File" },
+              },
+            },
           },
         },
       },
