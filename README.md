@@ -1,85 +1,201 @@
-<!--
-title: 'Serverless Framework Node Express API on AWS'
-description: 'This template demonstrates how to develop and deploy a simple Node Express API running on AWS Lambda using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-priority: 1
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# AWS Node Express Template
 
-# Serverless Framework Node Express API on AWS
+Node.js Express API для запуску в AWS Lambda через Serverless Framework.
 
-This template demonstrates how to develop and deploy a simple Node Express API service running on AWS Lambda using the Serverless Framework.
+Проєкт використовує один Lambda handler, який приймає HTTP API запити та передає їх у Express через `serverless-http`.
 
-This template configures a single function, `api`, which is responsible for handling all incoming requests using the `httpApi` event. To learn more about `httpApi` event configuration options, please refer to [httpApi event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/). As the event is configured in a way to accept all incoming requests, the Express.js framework is responsible for routing and handling requests internally. This implementation uses the `serverless-http` package to transform the incoming event request payloads to payloads compatible with Express.js. To learn more about `serverless-http`, please refer to the [serverless-http README](https://github.com/dougmoscrop/serverless-http).
+## Можливості
 
-## Usage
+- Авторизація користувачів
+- Робота з новинами
+- Swagger документація
+- Відправка email через AWS SES
+- Запуск локально через Express
+- Деплой в AWS Lambda через Serverless Framework
 
-### Deployment
+## Встановлення
 
-Install dependencies with:
+Встановити залежності:
 
-```
+```bash
 npm install
 ```
 
-and then deploy with:
+## Локальний запуск
 
+Запустити API локально:
+
+```bash
+npm run dev
 ```
+
+За замовчуванням сервер буде доступний за адресою:
+
+```bash
+http://localhost:3000
+```
+
+Swagger документація:
+
+```bash
+http://localhost:3000/docs
+```
+
+JSON Swagger схема:
+
+```bash
+http://localhost:3000/docs.json
+```
+
+## Налаштування AWS CLI
+
+Налаштувати AWS profile:
+
+```bash
+aws configure --profile yourProfileName
+```
+
+Активувати profile для поточної terminal session:
+
+```bash
+export AWS_PROFILE=yourProfileName
+```
+
+Встановити Serverless Framework глобально, якщо він ще не встановлений:
+
+```bash
+npm install serverless -g
+```
+
+## Деплой
+
+Перед деплоєм потрібно налаштувати всі необхідні env-змінні.
+
+```bash
+export AWS_PROFILE=yourProfileName
+export SES_FROM_EMAIL=sender@example.com
+```
+
+Запустити деплой:
+
+```bash
 serverless deploy
 ```
 
-After running deploy, you should see output similar to:
+Після успішного деплою Serverless покаже API URL. Його потрібно використовувати для HTTP запитів.
 
+## AWS SES Email
+
+Проєкт вміє відправляти email через AWS Simple Email Service.
+
+Доступні сценарії:
+
+- довільне notification повідомлення
+- welcome email після успішної реєстрації
+- notification про вхід в акаунт
+
+## Що створює Serverless для SES
+
+У `serverless.yml` налаштовано:
+
+- env-змінну `SES_FROM_EMAIL` для Lambda
+- IAM permission для `ses:SendEmail` та `ses:SendRawEmail`
+- SES Email Identity для адреси з `SES_FROM_EMAIL`
+
+`SES_FROM_EMAIL` має бути email адресою відправника.
+
+## Як підтвердити SES Email Identity
+
+Після деплою AWS SES відправить лист підтвердження на адресу з `SES_FROM_EMAIL`.
+
+Щоб підтвердити адресу:
+
+1. Відкрити поштову скриньку `SES_FROM_EMAIL`.
+2. Знайти лист від AWS SES.
+3. Натиснути verification link у листі.
+4. Відкрити AWS Console.
+5. Перейти в Amazon SES -> Configuration -> Verified identities.
+6. Перевірити, що identity має статус `Verified`.
+
+Якщо лист не прийшов, перевір spam або відправ verification email повторно з AWS Console.
+
+## SES Sandbox
+
+Нові AWS акаунти часто мають SES у sandbox mode.
+
+У sandbox mode:
+
+- email відправника має бути verified
+- email отримувача також має бути verified
+- не можна відправляти листи на будь-які зовнішні адреси без production access
+
+Щоб відправляти листи на будь-які адреси, потрібно запросити production access:
+
+```text
+AWS Console -> Amazon SES -> Account dashboard -> Request production access
 ```
-Deploying "aws-node-express-api" to stage "dev" (us-east-1)
 
-✔ Service deployed to stack aws-node-express-api-dev (96s)
+## Email Endpoint-и
 
-endpoint: ANY - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com
-functions:
-  api: aws-node-express-api-dev-api (2.3 kB)
+У прикладах нижче `https://your-api-url` потрібно замінити на URL, який повернув `serverless deploy`.
+
+### Відправити довільне повідомлення
+
+```bash
+curl -X POST https://your-api-url/email/notification \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "message": "Ваше повідомлення"
+  }'
 ```
 
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [`httpApi` event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/).
+### Відправити welcome email
 
-### Invocation
-
-After successful deployment, you can call the created application via HTTP:
-
+```bash
+curl -X POST https://your-api-url/email/welcome \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
 ```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
+
+### Відправити notification про вхід
+
+```bash
+curl -X POST https://your-api-url/email/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
 ```
 
-Which should result in the following response:
+Успішна відповідь:
 
 ```json
-{ "message": "Hello from root!" }
+{
+  "message": "Email sent successfully",
+  "messageId": "010201..."
+}
 ```
 
-### Local development
+## Типові проблеми SES
 
-The easiest way to develop and test your function is to use the `dev` command:
+- `Email address is not verified`: потрібно підтвердити `SES_FROM_EMAIL` в SES.
+- `MessageRejected`: якщо SES у sandbox mode, потрібно підтвердити також email отримувача.
+- `AccessDenied`: перевір `SES_FROM_EMAIL` і зроби redeploy, бо IAM permission створюється для конкретної identity.
+- Verification email не приходить: перевір spam або resend verification у AWS Console.
 
-```
-serverless dev
-```
+## Корисні команди
 
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
+TypeScript перевірка без build:
 
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
-
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
-
-### Setup AWS CLI
-
-In terminal paste this command:
 ```bash
-aws configure --profile yourProfileName
-export AWS_PROFILE = yourProfileName
-npm install serverless -g
+npx tsc --noEmit
+```
+
+Запуск production entry локально після build:
+
+```bash
+npm start
 ```

@@ -5,6 +5,25 @@ frameworkVersion: '4'
 provider:
   name: aws
   runtime: nodejs22.x
+  region: ${opt:region, 'eu-central-1'}
+  environment:
+    SES_FROM_EMAIL: ${env:SES_FROM_EMAIL}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource:
+            - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${env:SES_FROM_EMAIL}
+
+resources:
+  Resources:
+    SesEmailIdentity:
+      Type: AWS::SES::EmailIdentity
+      Properties:
+        EmailIdentity: ${env:SES_FROM_EMAIL}
 
 custom:
   prune: # автоматичне видалення старих версій
