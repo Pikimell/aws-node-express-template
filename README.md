@@ -33,6 +33,11 @@ TypeScript API на Express для запуску локально як звич
 - `POST /news` - створення новини.
 - `DELETE /news/:newsId` - видалення новини за MongoDB ObjectId.
 
+### Schedules
+
+- `POST /schedules/once` - створення одноразового виклику callback Lambda через EventBridge Scheduler.
+- `POST /schedules/recurring` - створення повторюваного виклику callback Lambda через EventBridge Scheduler.
+
 Параметри для `GET /news`:
 
 - `page` - номер сторінки, за замовчуванням `1`.
@@ -133,6 +138,34 @@ curl -X POST http://localhost:3000/news \
   -H "Content-Type: application/json" \
   -d '{"userId":"user-id","type":"news","typeAccount":"freeUser","topic":"Release","text":"News text","files":[]}'
 ```
+
+Одноразове нагадування:
+
+```bash
+curl -X POST http://localhost:3000/schedules/once \
+  -H "Content-Type: application/json" \
+  -d '{"runAt":"2026-08-09T12:30:00Z","payload":{"message":"Hello once"}}'
+```
+
+Повторюване нагадування через шаблонну частоту:
+
+```bash
+curl -X POST http://localhost:3000/schedules/recurring \
+  -H "Content-Type: application/json" \
+  -d '{"frequency":"daily","payload":{"message":"Hello daily"}}'
+```
+
+Повторюване нагадування через EventBridge Scheduler expression:
+
+```bash
+curl -X POST http://localhost:3000/schedules/recurring \
+  -H "Content-Type: application/json" \
+  -d '{"expression":"rate(1 week)","payload":{"message":"Hello weekly"}}'
+```
+
+Для `frequency` дозволено `daily` або `weekly`. Для `expression` дозволено `rate(...)` з одиницями `minute(s)`, `hour(s)`, `day(s)`, `week(s)` або `cron(...)`.
+
+Schedule endpoints створюють реальні EventBridge Scheduler schedules, тому для роботи потрібні AWS credentials і змінні Lambda, які задаються через `serverless.yml` після деплою.
 
 Отримання новин:
 

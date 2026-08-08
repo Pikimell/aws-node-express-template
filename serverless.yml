@@ -5,6 +5,30 @@ frameworkVersion: '4'
 provider:
   name: aws
   runtime: nodejs22.x
+  environment:
+    SCHEDULE_CALLBACK_LAMBDA_ARN:
+      Fn::GetAtt:
+        - ScheduleCallbackLambdaFunction
+        - Arn
+    SCHEDULER_ROLE_ARN:
+      Fn::GetAtt:
+        - SchedulerInvokeLambdaRole
+        - Arn
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - scheduler:CreateSchedule
+          Resource:
+            - Fn::Sub: arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/generic-schedule-*
+        - Effect: Allow
+          Action:
+            - iam:PassRole
+          Resource:
+            - Fn::GetAtt:
+                - SchedulerInvokeLambdaRole
+                - Arn
 
 custom:
   prune: # автоматичне видалення старих версій
@@ -16,3 +40,32 @@ functions:
     handler: dist/index.handler
     events:
       - httpApi: '*'
+  scheduleCallback:
+    handler: dist/functions/scheduleCallback.handler
+
+resources:
+  Resources:
+    SchedulerInvokeLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - scheduler.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: SchedulerInvokeLambdaPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource:
+                    - Fn::GetAtt:
+                        - ScheduleCallbackLambdaFunction
+                        - Arn
