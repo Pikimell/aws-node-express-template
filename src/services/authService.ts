@@ -45,7 +45,7 @@ const createAccessToken = (user: UserDocument) => {
 
   return jwt.sign(
     {
-      sub: user._id.toString(),
+      sub: user._id,
       email: user.email,
       role: user.role,
     },
@@ -62,7 +62,7 @@ const createSessionForUser = async (user: UserDocument, meta: SessionMeta): Prom
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_VALIDITY);
 
   await createSession({
-    userId: user._id.toString(),
+    userId: user._id,
     refreshToken,
     expiresAt,
     userAgent: meta.userAgent,
@@ -131,11 +131,11 @@ export const refreshService = async (refreshToken: string, meta: SessionMeta): P
     throw createHttpError(401, "Refresh token expired");
   }
 
-  const user = await getUserById(session.userId.toString());
+  const user = await getUserById(session.userId);
   const newRefreshToken = createRefreshToken();
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_VALIDITY);
 
-  await rotateSession(session._id.toString(), newRefreshToken, expiresAt, meta);
+  await rotateSession(session._id, newRefreshToken, expiresAt, meta);
 
   return {
     accessToken: createAccessToken(user),

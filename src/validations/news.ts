@@ -41,6 +41,6 @@ export const createNewsSchema = {
 
 export const deleteNewsSchema = {
   [Segments.PARAMS]: Joi.object({
-    newsId: Joi.string().hex().length(24).required(),
+    newsId: Joi.string().uuid().required(),
   }),
 };

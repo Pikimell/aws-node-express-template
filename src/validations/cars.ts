@@ -2,7 +2,7 @@ import { Joi, Segments } from 'celebrate';
 
 const carIdParamSchema = {
   [Segments.PARAMS]: Joi.object({
-    carId: Joi.string().hex().length(24).required(),
+    carId: Joi.string().uuid().required(),
   }),
 };
 

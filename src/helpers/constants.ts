@@ -8,7 +8,5 @@ export const ONE_MONTH = ONE_DAY * 31;
 export const ACCESS_TOKEN_SECRET = env("JWT_ACCESS_SECRET");
 export const ACCESS_TOKEN_EXPIRES_IN = env("ACCESS_TOKEN_EXPIRES_IN", "1d");
 
-export const MONGODB_USER = env("MONGODB_USER");
-export const MONGODB_PASSWORD = env("MONGODB_PASSWORD");
-export const MONGODB_URL = env("MONGODB_URL");
-export const MONGODB_DB = env("MONGODB_DB");
+export const DATABASE_URL = env("DATABASE_URL");
+export const POSTGRES_SSL = env("POSTGRES_SSL", "true") === "true";

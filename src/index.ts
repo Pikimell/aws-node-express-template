@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errors } from "celebrate";
 
-import { initMongoDB } from "./database/initMongoDb.js";
+import { initPostgres } from "./database/postgres.js";
 import { printRoutes } from "./helpers/printRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
 
-app.use(initMongoDB);
+app.use(initPostgres);
 
 app.use(requestLogger);
 

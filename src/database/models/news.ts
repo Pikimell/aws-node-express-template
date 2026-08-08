@@ -1,42 +1,17 @@
-import { HydratedDocument, InferSchemaType, model, Schema } from 'mongoose';
+export type NewsType = "updates" | "news" | "testimonials" | "video stories";
+export type NewsAccountType = "freeUser" | "paidUser" | "agencyUser";
 
-const newsSchema = new Schema(
-  {
-    userId: {
-      type: String,
-      required: true,
-    },
-    type: {
-      type: String,
-      required: true,
-      enum: ['updates', 'news', 'testimonials', 'video stories'],
-    },
-    typeAccount: {
-      type: String,
-      required: true,
-      enum: ['freeUser', 'paidUser', 'agencyUser'],
-    },
-    topic: {
-      type: String,
-      required: true,
-    },
-    text: {
-      type: String,
-      required: true,
-    },
+export type News = {
+  _id: string;
+  userId: string;
+  type: NewsType;
+  typeAccount: NewsAccountType;
+  topic: string;
+  text: string;
+  files: string[];
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-    files: {
-      type: [String],
-      default: [],
-    },
-  },
-  {
-    versionKey: false,
-    timestamps: true,
-  },
-);
-
-export type News = InferSchemaType<typeof newsSchema>;
-export type NewsDocument = HydratedDocument<News>;
-
-export const NewsCollection = model<News>('news', newsSchema);
+export type CreateNewsInput = Omit<News, "_id" | "createdAt" | "updatedAt">;
+export type NewsDocument = News;
