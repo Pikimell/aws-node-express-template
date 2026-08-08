@@ -1,3 +1,4 @@
+(2026-08-08) - Переписали README українською з описом реалізованого API та налаштувань запуску (docs: rewrite readme in ukrainian)
 (2026-08-08) - Додали створення Cognito User Pool, App Client, груп user/admin та IAM права для авторизації через serverless.yml (feat: add cognito serverless resources)
 (2026-08-08) - Оновили приклад env змінних для локального Cognito налаштування (docs: update env example)
 (2026-08-08) - Посилили логіку авторизації: прибрали збереження паролів, закрили вибір групи під час реєстрації, оновили refresh/logout та захистили admin routes (fix: harden cognito auth flow)

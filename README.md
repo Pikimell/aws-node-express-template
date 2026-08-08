@@ -1,85 +1,266 @@
-<!--
-title: 'Serverless Framework Node Express API on AWS'
-description: 'This template demonstrates how to develop and deploy a simple Node Express API running on AWS Lambda using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-priority: 1
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# AWS Node Express Template
 
-# Serverless Framework Node Express API on AWS
+Backend-шаблон на Node.js, Express і TypeScript для REST API з авторизацією через AWS Cognito, зберіганням даних у MongoDB та можливістю деплою в AWS Lambda через Serverless Framework.
 
-This template demonstrates how to develop and deploy a simple Node Express API service running on AWS Lambda using the Serverless Framework.
+## Що реалізовано
 
-This template configures a single function, `api`, which is responsible for handling all incoming requests using the `httpApi` event. To learn more about `httpApi` event configuration options, please refer to [httpApi event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/). As the event is configured in a way to accept all incoming requests, the Express.js framework is responsible for routing and handling requests internally. This implementation uses the `serverless-http` package to transform the incoming event request payloads to payloads compatible with Express.js. To learn more about `serverless-http`, please refer to the [serverless-http README](https://github.com/dougmoscrop/serverless-http).
+- Express API з TypeScript та ESM-модулями.
+- Підключення до MongoDB через Mongoose.
+- AWS Cognito авторизація:
+  - реєстрація користувача;
+  - підтвердження email кодом;
+  - логін;
+  - refresh token flow;
+  - logout через Cognito GlobalSignOut;
+  - запит на скидання пароля;
+  - підтвердження нового пароля.
+- HTTP-only cookies для `accessToken`, `refreshToken` і `sessionId`.
+- Перевірка Cognito access token через `aws-jwt-verify`.
+- Ролі користувачів через Cognito groups:
+  - `user`;
+  - `admin`.
+- News API:
+  - отримання списку новин;
+  - створення новини тільки для `admin`;
+  - видалення новини тільки для `admin`;
+  - пагінація, сортування та фільтри.
+- Валідація запитів через `celebrate` та `Joi`.
+- Middleware для логування запитів, обробки помилок та авторизації.
+- Serverless конфіг для AWS Lambda, HTTP API, Cognito User Pool, Cognito App Client та Cognito groups.
 
-## Usage
+## Вимоги
 
-### Deployment
+- Node.js 22 або сумісна версія.
+- npm.
+- MongoDB Atlas або інший MongoDB сервер з connection string у форматі `mongodb+srv`.
+- AWS акаунт для Cognito та деплою через Serverless.
+- AWS CLI, якщо планується деплой.
+- Serverless Framework v4, якщо планується деплой.
 
-Install dependencies with:
+## Встановлення
 
-```
+```bash
 npm install
 ```
 
-and then deploy with:
+## Environment variables
 
-```
-serverless deploy
-```
+Для локального запуску створи файл `.env` у корені проєкту:
 
-After running deploy, you should see output similar to:
+```env
+PORT=3000
+NODE_ENV=development
 
-```
-Deploying "aws-node-express-api" to stage "dev" (us-east-1)
+MONGODB_USER=your_mongodb_user
+MONGODB_PASSWORD=your_mongodb_password
+MONGODB_URL=your_cluster.mongodb.net
+MONGODB_DB=your_database_name
 
-✔ Service deployed to stack aws-node-express-api-dev (96s)
-
-endpoint: ANY - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com
-functions:
-  api: aws-node-express-api-dev-api (2.3 kB)
-```
-
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [`httpApi` event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api/).
-
-### Invocation
-
-After successful deployment, you can call the created application via HTTP:
-
-```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
+COGNITO_USER_POOL_ID=your_cognito_user_pool_id
+COGNITO_CLIENT_ID=your_cognito_app_client_id
 ```
 
-Which should result in the following response:
+Обов'язкові змінні:
+
+- `MONGODB_USER` - користувач MongoDB.
+- `MONGODB_PASSWORD` - пароль MongoDB.
+- `MONGODB_URL` - адреса MongoDB cluster без протоколу, наприклад `cluster0.xxxxx.mongodb.net`.
+- `MONGODB_DB` - назва бази даних.
+- `COGNITO_USER_POOL_ID` - ID Cognito User Pool.
+- `COGNITO_CLIENT_ID` - ID Cognito App Client.
+
+`PORT` необов'язковий. Якщо його не вказати, локальний сервер стартує на `3000`.
+
+## Локальний запуск
+
+```bash
+npm run dev
+```
+
+Сервер буде доступний за адресою:
+
+```text
+http://localhost:3000
+```
+
+У локальному режимі застосунок стартує як звичайний Express server. У production режимі експортується Lambda handler через `serverless-http`.
+
+## Скрипти
+
+- `npm run dev` - запускає локальний dev server через `nodemon` і `ts-node`.
+- `npm run build` - компілює TypeScript у `dist`.
+- `npm start` - компілює проєкт і запускає `dist/index.js`.
+- `npm run deploy` - компілює проєкт і виконує `sls deploy`.
+
+## API маршрути
+
+### Auth
+
+`POST /auth/register`
+
+Реєструє користувача в Cognito, додає його в групу `user` та створює локальний запис у MongoDB.
 
 ```json
-{ "message": "Hello from root!" }
+{
+  "email": "user@example.com",
+  "password": "Password1!"
+}
 ```
 
-### Local development
+`POST /auth/confirm`
 
-The easiest way to develop and test your function is to use the `dev` command:
+Підтверджує email користувача кодом з Cognito.
 
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
 ```
-serverless dev
+
+`POST /auth/login`
+
+Логінить користувача, встановлює auth cookies та повертає `accessToken`.
+
+```json
+{
+  "email": "user@example.com",
+  "password": "Password1!"
+}
 ```
 
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
+`POST /auth/refresh`
 
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
+Оновлює сесію через refresh token. Refresh token береться з cookie або тіла запиту.
 
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+```json
+{
+  "refreshToken": "refresh_token"
+}
+```
 
-### Setup AWS CLI
+`POST /auth/logout`
 
-In terminal paste this command:
+Завершує сесію користувача та очищає auth cookies.
+
+`POST /auth/reset/request`
+
+Надсилає email з кодом для скидання пароля.
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+`POST /auth/reset/confirm`
+
+Підтверджує скидання пароля.
+
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "newPassword": "NewPassword1!"
+}
+```
+
+### News
+
+`GET /news`
+
+Повертає список новин з пагінацією, сортуванням і фільтрами.
+
+Підтримувані query params:
+
+- `page` - номер сторінки.
+- `perPage` - кількість елементів на сторінку, максимум `100`.
+- `sortField` - `createdAt`, `topic`, `type`, `typeAccount`.
+- `sortOrder` - `asc` або `desc`.
+- `topic` - пошук по темі.
+- `typeAccount` - `freeUser`, `paidUser`, `agencyUser`.
+- `userId` - фільтр по користувачу.
+- `type` - `updates`, `news`, `testimonials`, `video stories`.
+
+Приклад:
+
+```text
+GET /news?page=1&perPage=10&sortField=createdAt&sortOrder=desc&type=news
+```
+
+`POST /news`
+
+Створює новину. Доступно тільки користувачам з Cognito group `admin`.
+
+Авторизація:
+
+```text
+Authorization: Bearer access_token
+```
+
+Тіло запиту:
+
+```json
+{
+  "userId": "user-id",
+  "type": "news",
+  "typeAccount": "freeUser",
+  "topic": "Тема новини",
+  "text": "Текст новини",
+  "files": ["https://example.com/file.png"]
+}
+```
+
+`DELETE /news/:newsId`
+
+Видаляє новину за MongoDB ObjectId. Доступно тільки користувачам з Cognito group `admin`.
+
+## Налаштування AWS для деплою
+
+1. Налаштуй AWS CLI профіль:
+
 ```bash
 aws configure --profile yourProfileName
-export AWS_PROFILE = yourProfileName
-npm install serverless -g
 ```
+
+2. Активуй профіль у поточній shell-сесії:
+
+```bash
+export AWS_PROFILE=yourProfileName
+```
+
+3. Встанови Serverless Framework, якщо він ще не встановлений:
+
+```bash
+npm install -g serverless
+```
+
+4. Запусти деплой:
+
+```bash
+npm run deploy
+```
+
+Під час деплою Serverless створює:
+
+- AWS Lambda function `api`;
+- HTTP API endpoint;
+- Cognito User Pool;
+- Cognito User Pool Client;
+- Cognito groups `user` та `admin`;
+- IAM permissions для Cognito admin operations.
+
+Після деплою у outputs будуть доступні:
+
+- `CognitoUserPoolId`;
+- `CognitoUserPoolClientId`.
+
+Їх можна використовувати для локального `.env`.
+
+## Важливі примітки
+
+- Пароль має містити мінімум 8 символів, велику літеру, малу літеру, цифру та спеціальний символ.
+- Нові користувачі автоматично додаються в Cognito group `user`.
+- Admin-доступ до News API залежить від Cognito group `admin`.
+- Cookies мають `httpOnly` і `sameSite=strict`; у production також вмикається `secure`.
+- MongoDB підключається middleware-ом перед обробкою запиту і кешується для повторного використання.
