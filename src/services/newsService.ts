@@ -1,4 +1,4 @@
-import { query } from "../database/postgres.js";
+import { supabase } from "../database/supabase.js";
 import type { CreateNewsInput, News } from "../database/models/news.js";
 import { calculatePaginationData } from "../utils/calculatePaginationData.js";
 
@@ -10,7 +10,19 @@ export type NewsQueryOptions = NewsQueryFilters & {
   sort?: Record<string, 1 | -1>;
 };
 
-const NEWS_SORT_COLUMNS: Record<string, string> = {
+type NewsRow = {
+  id: string;
+  user_id: string;
+  type: News["type"];
+  type_account: News["typeAccount"];
+  topic: string;
+  text: string;
+  files: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+const NEWS_SORT_COLUMNS: Record<string, keyof NewsRow> = {
   createdAt: "created_at",
   updatedAt: "updated_at",
   topic: "topic",
@@ -18,48 +30,26 @@ const NEWS_SORT_COLUMNS: Record<string, string> = {
   typeAccount: "type_account",
 };
 
-const newsSelect = `
-  id as "_id",
-  user_id as "userId",
-  type,
-  type_account as "typeAccount",
-  topic,
-  text,
-  files,
-  created_at as "createdAt",
-  updated_at as "updatedAt"
-`;
+const newsSelect =
+  "id,user_id,type,type_account,topic,text,files,created_at,updated_at";
 
-const getSortClause = (sort: Record<string, 1 | -1>) => {
+const mapNews = (row: NewsRow): News => ({
+  _id: row.id,
+  userId: row.user_id,
+  type: row.type,
+  typeAccount: row.type_account,
+  topic: row.topic,
+  text: row.text,
+  files: row.files,
+  createdAt: new Date(row.created_at),
+  updatedAt: new Date(row.updated_at),
+});
+
+const getSort = (sort: Record<string, 1 | -1>) => {
   const [field = "createdAt", direction = -1] = Object.entries(sort)[0] ?? [];
-  const column = NEWS_SORT_COLUMNS[field] ?? NEWS_SORT_COLUMNS.createdAt;
-  return `${column} ${direction === 1 ? "asc" : "desc"}`;
-};
-
-const buildWhereClause = (filters: NewsQueryFilters) => {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-
-  if (filters.topic) {
-    values.push(`%${filters.topic}%`);
-    conditions.push(`topic ilike $${values.length}`);
-  }
-  if (filters.typeAccount) {
-    values.push(filters.typeAccount);
-    conditions.push(`type_account = $${values.length}`);
-  }
-  if (filters.userId) {
-    values.push(filters.userId);
-    conditions.push(`user_id = $${values.length}`);
-  }
-  if (filters.type) {
-    values.push(filters.type);
-    conditions.push(`type = $${values.length}`);
-  }
-
   return {
-    values,
-    where: conditions.length ? `where ${conditions.join(" and ")}` : "",
+    column: NEWS_SORT_COLUMNS[field] ?? NEWS_SORT_COLUMNS.createdAt,
+    ascending: direction === 1,
   };
 };
 
@@ -70,33 +60,29 @@ export const getAllNews = async ({
   ...filters
 }: NewsQueryOptions) => {
   const offset = (page - 1) * perPage;
-
-  const { values, where } = buildWhereClause(filters);
-  const orderBy = getSortClause(sort);
+  const { column, ascending } = getSort(sort);
 
   try {
-    const totalResult = await query<{ count: string }>(
-      `select count(*) from news ${where}`,
-      values
-    );
-    const newsResult = await query<News>(
-      `
-        select ${newsSelect}
-        from news
-        ${where}
-        order by ${orderBy}
-        limit $${values.length + 1}
-        offset $${values.length + 2}
-      `,
-      [...values, perPage, offset]
-    );
-    const totalNews = Number(totalResult.rows[0]?.count ?? 0);
+    let request = supabase
+      .from("news")
+      .select(newsSelect, { count: "exact" })
+      .order(column, { ascending })
+      .range(offset, offset + perPage - 1);
 
-    const paginationInfo = calculatePaginationData(totalNews, page, perPage);
+    if (filters.topic) request = request.ilike("topic", `%${filters.topic}%`);
+    if (filters.typeAccount) request = request.eq("type_account", filters.typeAccount);
+    if (filters.userId) request = request.eq("user_id", filters.userId);
+    if (filters.type) request = request.eq("type", filters.type);
+
+    const { data, count, error } = await request.returns<NewsRow[]>();
+
+    if (error) throw error;
+
+    const paginationInfo = calculatePaginationData(count ?? 0, page, perPage);
 
     return {
       ...paginationInfo,
-      news: newsResult.rows,
+      news: (data ?? []).map(mapNews),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -106,23 +92,21 @@ export const getAllNews = async ({
 
 export const createNews = async (newsData: CreateNewsInput) => {
   try {
-    const result = await query<News>(
-      `
-        insert into news (user_id, type, type_account, topic, text, files)
-        values ($1, $2, $3, $4, $5, $6)
-        returning ${newsSelect}
-      `,
-      [
-        newsData.userId,
-        newsData.type,
-        newsData.typeAccount,
-        newsData.topic,
-        newsData.text,
-        newsData.files ?? [],
-      ]
-    );
+    const { data, error } = await supabase
+      .from("news")
+      .insert({
+        user_id: newsData.userId,
+        type: newsData.type,
+        type_account: newsData.typeAccount,
+        topic: newsData.topic,
+        text: newsData.text,
+        files: newsData.files ?? [],
+      })
+      .select(newsSelect)
+      .single<NewsRow>();
 
-    return result.rows[0];
+    if (error) throw error;
+    return mapNews(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     throw new Error("Error creating news: " + message);
@@ -131,16 +115,15 @@ export const createNews = async (newsData: CreateNewsInput) => {
 
 export const deleteNews = async (newsId: string) => {
   try {
-    const result = await query<News>(
-      `
-        delete from news
-        where id = $1
-        returning ${newsSelect}
-      `,
-      [newsId]
-    );
+    const { data, error } = await supabase
+      .from("news")
+      .delete()
+      .eq("id", newsId)
+      .select(newsSelect)
+      .maybeSingle<NewsRow>();
 
-    return result.rows[0] ?? null;
+    if (error) throw error;
+    return data ? mapNews(data) : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     throw new Error("Error deleting news: " + message);

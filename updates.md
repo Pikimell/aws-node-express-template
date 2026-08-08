@@ -3,3 +3,4 @@
 (2026-08-08) - Додали модель cars з CRUD сервісами, контролерами, валідаціями та роутами (feat: add cars crud)
 (2026-08-08) - Додали приклади агрегованих запитів для cars статистики (feat: add cars aggregation examples)
 (2026-08-08) - Переписали доступ до даних з MongoDB/Mongoose на прямі SQL-запити до PostgreSQL/Supabase (refactor: migrate data layer to postgresql)
+(2026-08-08) - Переписали доступ до Supabase з прямих SQL-запитів на Supabase SDK та оновили README (refactor: use supabase sdk data access)

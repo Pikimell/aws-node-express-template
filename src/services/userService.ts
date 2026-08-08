@@ -1,4 +1,4 @@
-import { query } from "../database/postgres.js";
+import { supabase } from "../database/supabase.js";
 import type { User, UserDocument, UserRole } from "../database/models/user.js";
 
 export type CreateUserInput = {
@@ -9,54 +9,50 @@ export type CreateUserInput = {
 };
 
 type UserRow = {
-  _id: string;
+  id: string;
   email: string;
   nickname: string;
   password: string;
   role: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: string;
+  updated_at: string;
 };
 
-export const createUser = async (userData: CreateUserInput): Promise<User> => {
-  const result = await query<UserRow>(
-    `
-      insert into users (email, password, nickname, role)
-      values ($1, $2, $3, $4)
-      returning
-        id as "_id",
-        email,
-        nickname,
-        password,
-        role,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-    `,
-    [userData.email, userData.password, userData.nickname, userData.role]
-  );
+const mapUser = (row: UserRow): User => ({
+  _id: row.id,
+  email: row.email,
+  nickname: row.nickname,
+  password: row.password,
+  role: row.role,
+  createdAt: new Date(row.created_at),
+  updatedAt: new Date(row.updated_at),
+});
 
-  return result.rows[0];
+export const createUser = async (userData: CreateUserInput): Promise<User> => {
+  const { data, error } = await supabase
+    .from("users")
+    .insert({
+      email: userData.email,
+      password: userData.password,
+      nickname: userData.nickname,
+      role: userData.role,
+    })
+    .select("id,email,nickname,password,role,created_at,updated_at")
+    .single<UserRow>();
+
+  if (error) throw error;
+  return mapUser(data);
 };
 
 export const findUserByEmail = async (email: string): Promise<User | null> => {
-  const result = await query<UserRow>(
-    `
-      select
-        id as "_id",
-        email,
-        nickname,
-        password,
-        role,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      from users
-      where email = $1
-      limit 1
-    `,
-    [email]
-  );
+  const { data, error } = await supabase
+    .from("users")
+    .select("id,email,nickname,password,role,created_at,updated_at")
+    .eq("email", email)
+    .maybeSingle<UserRow>();
 
-  return result.rows[0] ?? null;
+  if (error) throw error;
+  return data ? mapUser(data) : null;
 };
 
 export const getUserByEmail = async (email: string): Promise<UserDocument> => {
@@ -70,27 +66,17 @@ export const getUserByEmail = async (email: string): Promise<UserDocument> => {
 };
 
 export const getUserById = async (id: string): Promise<UserDocument> => {
-  const result = await query<UserRow>(
-    `
-      select
-        id as "_id",
-        email,
-        nickname,
-        password,
-        role,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      from users
-      where id = $1
-      limit 1
-    `,
-    [id]
-  );
-  const user = result.rows[0];
+  const { data, error } = await supabase
+    .from("users")
+    .select("id,email,nickname,password,role,created_at,updated_at")
+    .eq("id", id)
+    .maybeSingle<UserRow>();
 
-  if (!user) {
+  if (error) throw error;
+
+  if (!data) {
     throw new Error("User not found");
   }
 
-  return user;
+  return mapUser(data);
 };

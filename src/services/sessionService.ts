@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-import { query } from "../database/postgres.js";
+import { supabase } from "../database/supabase.js";
 import type { Session } from "../database/models/session.js";
 
 const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
@@ -18,6 +18,31 @@ type RotateSessionMeta = {
   ip?: string;
 };
 
+type SessionRow = {
+  id: string;
+  user_id: string;
+  refresh_token: string;
+  expires_at: string;
+  user_agent: string | null;
+  ip: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const sessionSelect =
+  "id,user_id,refresh_token,expires_at,user_agent,ip,created_at,updated_at";
+
+const mapSession = (row: SessionRow): Session => ({
+  _id: row.id,
+  userId: row.user_id,
+  refreshToken: row.refresh_token,
+  expiresAt: new Date(row.expires_at),
+  userAgent: row.user_agent,
+  ip: row.ip,
+  createdAt: new Date(row.created_at),
+  updatedAt: new Date(row.updated_at),
+});
+
 export const createSession = async ({
   userId,
   refreshToken,
@@ -26,52 +51,44 @@ export const createSession = async ({
   ip,
 }: CreateSessionArgs) => {
   const hashedToken = hashToken(refreshToken);
-  const result = await query<Session>(
-    `
-      insert into sessions (user_id, refresh_token, expires_at, user_agent, ip)
-      values ($1, $2, $3, $4, $5)
-      returning
-        id as "_id",
-        user_id as "userId",
-        refresh_token as "refreshToken",
-        expires_at as "expiresAt",
-        user_agent as "userAgent",
-        ip,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-    `,
-    [userId, hashedToken, expiresAt, userAgent ?? null, ip ?? null]
-  );
 
-  return result.rows[0];
+  const { data, error } = await supabase
+    .from("sessions")
+    .insert({
+      user_id: userId,
+      refresh_token: hashedToken,
+      expires_at: expiresAt.toISOString(),
+      user_agent: userAgent ?? null,
+      ip: ip ?? null,
+    })
+    .select(sessionSelect)
+    .single<SessionRow>();
+
+  if (error) throw error;
+  return mapSession(data);
 };
 
 export const getSessionByToken = async (refreshToken: string) => {
   const hashedToken = hashToken(refreshToken);
-  const result = await query<Session>(
-    `
-      select
-        id as "_id",
-        user_id as "userId",
-        refresh_token as "refreshToken",
-        expires_at as "expiresAt",
-        user_agent as "userAgent",
-        ip,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      from sessions
-      where refresh_token = $1
-      limit 1
-    `,
-    [hashedToken]
-  );
 
-  return result.rows[0] ?? null;
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(sessionSelect)
+    .eq("refresh_token", hashedToken)
+    .maybeSingle<SessionRow>();
+
+  if (error) throw error;
+  return data ? mapSession(data) : null;
 };
 
 export const deleteSessionByToken = async (refreshToken: string) => {
   const hashedToken = hashToken(refreshToken);
-  return query("delete from sessions where refresh_token = $1", [hashedToken]);
+  const { error } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("refresh_token", hashedToken);
+
+  if (error) throw error;
 };
 
 export const rotateSession = async (
@@ -81,28 +98,23 @@ export const rotateSession = async (
   meta?: RotateSessionMeta
 ) => {
   const hashedToken = hashToken(refreshToken);
-  const result = await query<Session>(
-    `
-      update sessions
-      set
-        refresh_token = $2,
-        expires_at = $3,
-        user_agent = coalesce($4, user_agent),
-        ip = coalesce($5, ip),
-        updated_at = now()
-      where id = $1
-      returning
-        id as "_id",
-        user_id as "userId",
-        refresh_token as "refreshToken",
-        expires_at as "expiresAt",
-        user_agent as "userAgent",
-        ip,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-    `,
-    [sessionId, hashedToken, expiresAt, meta?.userAgent ?? null, meta?.ip ?? null]
-  );
 
-  return result.rows[0] ?? null;
+  const updates: Record<string, unknown> = {
+    refresh_token: hashedToken,
+    expires_at: expiresAt.toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (meta?.userAgent) updates.user_agent = meta.userAgent;
+  if (meta?.ip) updates.ip = meta.ip;
+
+  const { data, error } = await supabase
+    .from("sessions")
+    .update(updates)
+    .eq("id", sessionId)
+    .select(sessionSelect)
+    .maybeSingle<SessionRow>();
+
+  if (error) throw error;
+  return data ? mapSession(data) : null;
 };

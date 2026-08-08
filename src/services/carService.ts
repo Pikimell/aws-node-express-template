@@ -1,4 +1,4 @@
-import { query } from '../database/postgres.js';
+import { supabase } from '../database/supabase.js';
 import type {
   Car,
   CreateCarInput,
@@ -18,7 +18,22 @@ export type CarQueryOptions = CarQueryFilters & {
 
 export type CarsAggregationFilters = Partial<Pick<Car, 'userId' | 'make'>>;
 
-const CAR_SORT_COLUMNS: Record<string, string> = {
+type CarRow = {
+  id: string;
+  user_id: string;
+  make: string;
+  model: string;
+  year: number;
+  color: string | null;
+  price: number | null;
+  mileage: number | null;
+  vin: string | null;
+  images: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+const CAR_SORT_COLUMNS: Record<string, keyof CarRow> = {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   make: 'make',
@@ -28,67 +43,79 @@ const CAR_SORT_COLUMNS: Record<string, string> = {
   mileage: 'mileage',
 };
 
-const carSelect = `
-  id as "_id",
-  user_id as "userId",
-  make,
-  model,
-  year,
-  color,
-  price::float as price,
-  mileage::float as mileage,
-  vin,
-  images,
-  created_at as "createdAt",
-  updated_at as "updatedAt"
-`;
+const carSelect =
+  'id,user_id,make,model,year,color,price,mileage,vin,images,created_at,updated_at';
 
-const getSortClause = (sort: Record<string, 1 | -1>) => {
+const mapCar = (row: CarRow): Car => ({
+  _id: row.id,
+  userId: row.user_id,
+  make: row.make,
+  model: row.model,
+  year: row.year,
+  color: row.color,
+  price: row.price,
+  mileage: row.mileage,
+  vin: row.vin,
+  images: row.images,
+  createdAt: new Date(row.created_at),
+  updatedAt: new Date(row.updated_at),
+});
+
+const getSort = (sort: Record<string, 1 | -1>) => {
   const [field = 'createdAt', direction = -1] = Object.entries(sort)[0] ?? [];
-  const column = CAR_SORT_COLUMNS[field] ?? CAR_SORT_COLUMNS.createdAt;
-  return `${column} ${direction === 1 ? 'asc' : 'desc'}`;
+  return {
+    column: CAR_SORT_COLUMNS[field] ?? CAR_SORT_COLUMNS.createdAt,
+    ascending: direction === 1,
+  };
 };
 
-const buildCarsWhereClause = (filters: CarQueryFilters | CarsAggregationFilters) => {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+const applyCarFilters = <T>(
+  request: T,
+  filters: CarQueryFilters | CarsAggregationFilters,
+) => {
+  let filtered = request as T & {
+    eq: (column: string, value: unknown) => typeof filtered;
+    ilike: (column: string, pattern: string) => typeof filtered;
+  };
 
-  if (filters.userId) {
-    values.push(filters.userId);
-    conditions.push(`user_id = $${values.length}`);
-  }
-  if (filters.make) {
-    values.push(`%${filters.make}%`);
-    conditions.push(`make ilike $${values.length}`);
-  }
+  if (filters.userId) filtered = filtered.eq('user_id', filters.userId);
+  if (filters.make) filtered = filtered.ilike('make', `%${filters.make}%`);
   if ('model' in filters && filters.model) {
-    values.push(`%${filters.model}%`);
-    conditions.push(`model ilike $${values.length}`);
+    filtered = filtered.ilike('model', `%${filters.model}%`);
   }
-  if ('year' in filters && filters.year) {
-    values.push(filters.year);
-    conditions.push(`year = $${values.length}`);
-  }
+  if ('year' in filters && filters.year) filtered = filtered.eq('year', filters.year);
   if ('color' in filters && filters.color) {
-    values.push(`%${filters.color}%`);
-    conditions.push(`color ilike $${values.length}`);
+    filtered = filtered.ilike('color', `%${filters.color}%`);
   }
   if ('vin' in filters && filters.vin) {
-    values.push(filters.vin.toUpperCase());
-    conditions.push(`vin = $${values.length}`);
+    filtered = filtered.eq('vin', filters.vin.toUpperCase());
   }
 
-  return {
-    values,
-    where: conditions.length ? `where ${conditions.join(' and ')}` : '',
-  };
+  return filtered as T;
 };
 
-const normalizeCarInput = (carData: CreateCarInput | UpdateCarInput) => {
-  return {
-    ...carData,
-    vin: carData.vin ? carData.vin.toUpperCase() : carData.vin,
-  };
+const normalizeCarInput = (carData: CreateCarInput | UpdateCarInput) => ({
+  ...carData,
+  vin: carData.vin ? carData.vin.toUpperCase() : carData.vin,
+});
+
+const average = (values: number[]) => {
+  if (!values.length) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2));
+};
+
+const compactNumbers = (values: Array<number | null | undefined>) =>
+  values.filter((value): value is number => typeof value === 'number');
+
+const fetchCarsForStats = async (filters: CarsAggregationFilters) => {
+  const request = applyCarFilters(
+    supabase.from('cars').select(carSelect),
+    filters,
+  );
+  const { data, error } = await request.returns<CarRow[]>();
+
+  if (error) throw error;
+  return (data ?? []).map(mapCar);
 };
 
 export const getAllCars = async ({
@@ -98,33 +125,26 @@ export const getAllCars = async ({
   ...filters
 }: CarQueryOptions) => {
   const offset = (page - 1) * perPage;
-
-  const { values, where } = buildCarsWhereClause(filters);
-  const orderBy = getSortClause(sort);
+  const { column, ascending } = getSort(sort);
 
   try {
-    const totalResult = await query<{ count: string }>(
-      `select count(*) from cars ${where}`,
-      values,
+    const request = applyCarFilters(
+      supabase
+        .from('cars')
+        .select(carSelect, { count: 'exact' })
+        .order(column, { ascending })
+        .range(offset, offset + perPage - 1),
+      filters,
     );
-    const carsResult = await query<Car>(
-      `
-        select ${carSelect}
-        from cars
-        ${where}
-        order by ${orderBy}
-        limit $${values.length + 1}
-        offset $${values.length + 2}
-      `,
-      [...values, perPage, offset],
-    );
-    const totalCars = Number(totalResult.rows[0]?.count ?? 0);
+    const { data, count, error } = await request.returns<CarRow[]>();
 
-    const paginationInfo = calculatePaginationData(totalCars, page, perPage);
+    if (error) throw error;
+
+    const paginationInfo = calculatePaginationData(count ?? 0, page, perPage);
 
     return {
       ...paginationInfo,
-      cars: carsResult.rows,
+      cars: (data ?? []).map(mapCar),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -135,27 +155,30 @@ export const getAllCars = async ({
 export const getCarsStatsByMake = async (
   filters: CarsAggregationFilters = {},
 ) => {
-  const { values, where } = buildCarsWhereClause(filters);
-
   try {
-    const result = await query(
-      `
-        select
-          make,
-          count(*)::int as "totalCars",
-          round(avg(price)::numeric, 2)::float as "averagePrice",
-          round(avg(mileage)::numeric, 2)::float as "averageMileage",
-          min(year)::int as "minYear",
-          max(year)::int as "maxYear"
-        from cars
-        ${where}
-        group by make
-        order by "totalCars" desc, make asc
-      `,
-      values,
-    );
+    const cars = await fetchCarsForStats(filters);
+    const groups = new Map<string, Car[]>();
 
-    return result.rows;
+    for (const car of cars) {
+      groups.set(car.make, [...(groups.get(car.make) ?? []), car]);
+    }
+
+    return [...groups.entries()]
+      .map(([make, makeCars]) => {
+        const prices = compactNumbers(makeCars.map((car) => car.price));
+        const mileages = compactNumbers(makeCars.map((car) => car.mileage));
+        const years = makeCars.map((car) => car.year);
+
+        return {
+          make,
+          totalCars: makeCars.length,
+          averagePrice: average(prices),
+          averageMileage: average(mileages),
+          minYear: Math.min(...years),
+          maxYear: Math.max(...years),
+        };
+      })
+      .sort((a, b) => b.totalCars - a.totalCars || a.make.localeCompare(b.make));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error fetching cars stats by make: ' + message);
@@ -165,25 +188,22 @@ export const getCarsStatsByMake = async (
 export const getCarsStatsByYear = async (
   filters: CarsAggregationFilters = {},
 ) => {
-  const { values, where } = buildCarsWhereClause(filters);
-
   try {
-    const result = await query(
-      `
-        select
-          year,
-          count(*)::int as "totalCars",
-          round(avg(price)::numeric, 2)::float as "averagePrice",
-          array_agg(distinct make order by make) as makes
-        from cars
-        ${where}
-        group by year
-        order by year desc
-      `,
-      values,
-    );
+    const cars = await fetchCarsForStats(filters);
+    const groups = new Map<number, Car[]>();
 
-    return result.rows;
+    for (const car of cars) {
+      groups.set(car.year, [...(groups.get(car.year) ?? []), car]);
+    }
+
+    return [...groups.entries()]
+      .map(([year, yearCars]) => ({
+        year,
+        totalCars: yearCars.length,
+        averagePrice: average(compactNumbers(yearCars.map((car) => car.price))),
+        makes: [...new Set(yearCars.map((car) => car.make))].sort(),
+      }))
+      .sort((a, b) => b.year - a.year);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error fetching cars stats by year: ' + message);
@@ -191,33 +211,18 @@ export const getCarsStatsByYear = async (
 };
 
 export const getCarsSummary = async (filters: CarsAggregationFilters = {}) => {
-  const { values, where } = buildCarsWhereClause(filters);
-
   try {
-    const result = await query(
-      `
-        select
-          count(*)::int as "totalCars",
-          round(avg(price)::numeric, 2)::float as "averagePrice",
-          min(price)::float as "minPrice",
-          max(price)::float as "maxPrice",
-          round(avg(mileage)::numeric, 2)::float as "averageMileage"
-        from cars
-        ${where}
-      `,
-      values,
-    );
-    const summary = result.rows[0];
+    const cars = await fetchCarsForStats(filters);
+    const prices = compactNumbers(cars.map((car) => car.price));
+    const mileages = compactNumbers(cars.map((car) => car.mileage));
 
-    return (
-      summary || {
-        totalCars: 0,
-        averagePrice: null,
-        minPrice: null,
-        maxPrice: null,
-        averageMileage: null,
-      }
-    );
+    return {
+      totalCars: cars.length,
+      averagePrice: average(prices),
+      minPrice: prices.length ? Math.min(...prices) : null,
+      maxPrice: prices.length ? Math.max(...prices) : null,
+      averageMileage: average(mileages),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error fetching cars summary: ' + message);
@@ -226,17 +231,14 @@ export const getCarsSummary = async (filters: CarsAggregationFilters = {}) => {
 
 export const getCarById = async (carId: string) => {
   try {
-    const result = await query<Car>(
-      `
-        select ${carSelect}
-        from cars
-        where id = $1
-        limit 1
-      `,
-      [carId],
-    );
+    const { data, error } = await supabase
+      .from('cars')
+      .select(carSelect)
+      .eq('id', carId)
+      .maybeSingle<CarRow>();
 
-    return result.rows[0] ?? null;
+    if (error) throw error;
+    return data ? mapCar(data) : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error fetching car: ' + message);
@@ -246,28 +248,24 @@ export const getCarById = async (carId: string) => {
 export const createCar = async (carData: CreateCarInput) => {
   try {
     const data = normalizeCarInput(carData);
-    const result = await query<Car>(
-      `
-        insert into cars (
-          user_id, make, model, year, color, price, mileage, vin, images
-        )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        returning ${carSelect}
-      `,
-      [
-        data.userId,
-        data.make,
-        data.model,
-        data.year,
-        data.color ?? null,
-        data.price ?? null,
-        data.mileage ?? null,
-        data.vin ?? null,
-        data.images ?? [],
-      ],
-    );
+    const { data: createdCar, error } = await supabase
+      .from('cars')
+      .insert({
+        user_id: data.userId,
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        color: data.color ?? null,
+        price: data.price ?? null,
+        mileage: data.mileage ?? null,
+        vin: data.vin ?? null,
+        images: data.images ?? [],
+      })
+      .select(carSelect)
+      .single<CarRow>();
 
-    return result.rows[0];
+    if (error) throw error;
+    return mapCar(createdCar);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error creating car: ' + message);
@@ -277,38 +275,29 @@ export const createCar = async (carData: CreateCarInput) => {
 export const updateCar = async (carId: string, carData: UpdateCarInput) => {
   try {
     const data = normalizeCarInput(carData);
-    const result = await query<Car>(
-      `
-        update cars
-        set
-          user_id = coalesce($2, user_id),
-          make = coalesce($3, make),
-          model = coalesce($4, model),
-          year = coalesce($5, year),
-          color = coalesce($6, color),
-          price = coalesce($7, price),
-          mileage = coalesce($8, mileage),
-          vin = coalesce($9, vin),
-          images = coalesce($10, images),
-          updated_at = now()
-        where id = $1
-        returning ${carSelect}
-      `,
-      [
-        carId,
-        data.userId ?? null,
-        data.make ?? null,
-        data.model ?? null,
-        data.year ?? null,
-        data.color ?? null,
-        data.price ?? null,
-        data.mileage ?? null,
-        data.vin ?? null,
-        data.images ?? null,
-      ],
-    );
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
 
-    return result.rows[0] ?? null;
+    if (data.userId !== undefined) updates.user_id = data.userId;
+    if (data.make !== undefined) updates.make = data.make;
+    if (data.model !== undefined) updates.model = data.model;
+    if (data.year !== undefined) updates.year = data.year;
+    if (data.color !== undefined) updates.color = data.color;
+    if (data.price !== undefined) updates.price = data.price;
+    if (data.mileage !== undefined) updates.mileage = data.mileage;
+    if (data.vin !== undefined) updates.vin = data.vin;
+    if (data.images !== undefined) updates.images = data.images;
+
+    const { data: updatedCar, error } = await supabase
+      .from('cars')
+      .update(updates)
+      .eq('id', carId)
+      .select(carSelect)
+      .maybeSingle<CarRow>();
+
+    if (error) throw error;
+    return updatedCar ? mapCar(updatedCar) : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error updating car: ' + message);
@@ -317,16 +306,15 @@ export const updateCar = async (carId: string, carData: UpdateCarInput) => {
 
 export const deleteCar = async (carId: string) => {
   try {
-    const result = await query<Car>(
-      `
-        delete from cars
-        where id = $1
-        returning ${carSelect}
-      `,
-      [carId],
-    );
+    const { data, error } = await supabase
+      .from('cars')
+      .delete()
+      .eq('id', carId)
+      .select(carSelect)
+      .maybeSingle<CarRow>();
 
-    return result.rows[0] ?? null;
+    if (error) throw error;
+    return data ? mapCar(data) : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error('Error deleting car: ' + message);

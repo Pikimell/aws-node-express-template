@@ -1,19 +1,19 @@
 # AWS Node Express Template
 
-TypeScript API на Express для запуску локально як звичайний HTTP-сервер і для деплою в AWS Lambda через Serverless Framework. Проєкт працює з PostgreSQL, зокрема з Supabase Postgres, через прямий `DATABASE_URL` і SQL-запити без `supabase-js`.
+TypeScript API на Express для запуску локально як звичайний HTTP-сервер і для деплою в AWS Lambda через Serverless Framework. Проєкт працює із Supabase через `@supabase/supabase-js`: сервер звертається до таблиць Supabase SDK-запитами, без прямого PostgreSQL connection URL у коді.
 
 ## Що реалізовано
 
 - Express API з TypeScript та ESM-модулями.
-- Пряме підключення до PostgreSQL через `pg`.
+- Підключення до Supabase через `@supabase/supabase-js`.
 - Реєстрація, логін, logout, refresh token і отримання поточного користувача.
 - Хешування паролів через `bcryptjs`.
 - Access token через JWT та refresh token у таблиці `sessions`.
 - HTTP-only cookie `accessToken` і `refreshToken`.
 - Валідація запитів через `celebrate`/`Joi`.
 - CRUD для `news` і `cars`.
-- Пагінація, сортування і фільтрація списків.
-- SQL-агрегації для статистики авто.
+- Пагінація, сортування і фільтрація списків через Supabase SDK.
+- Статистика авто рахується у сервісі на основі даних, отриманих із Supabase.
 - Swagger UI на `/docs` і OpenAPI JSON на `/docs.json`.
 - Обгортка `serverless-http` для запуску Express у AWS Lambda.
 
@@ -50,29 +50,19 @@ TypeScript API на Express для запуску локально як звич
 
 - Node.js 22 або сумісна версія.
 - npm.
-- Supabase проєкт з Postgres database або будь-яка PostgreSQL база.
+- Supabase проєкт.
 - Для деплою: AWS CLI, Serverless Framework v4 і налаштований AWS profile.
 
-## Як взяти PostgreSQL connection URL у Supabase
+## Як взяти Supabase змінні
 
 1. Відкрийте Supabase Dashboard.
 2. Зайдіть у потрібний проєкт.
-3. Перейдіть у `Project Settings` -> `Database`.
-4. Відкрийте блок `Connection string`.
-5. Для AWS Lambda/serverless краще обрати `Session pooler`, бо Lambda може створювати багато коротких підключень.
-6. Скопіюйте URI у форматі:
+3. Перейдіть у `Project Settings` -> `API`.
+4. Скопіюйте `Project URL` - це значення для `SUPABASE_URL`.
+5. У цьому ж розділі відкрийте `Project API keys`.
+6. Скопіюйте `service_role` key - це значення для `SUPABASE_SERVICE_ROLE_KEY`.
 
-```text
-postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
-```
-
-Для локальної розробки також можна використати `Direct connection`:
-
-```text
-postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
-```
-
-У скопійованому рядку замініть `<password>` на пароль бази даних. Його ви задавали під час створення Supabase проєкту. Якщо не пам'ятаєте пароль, у Supabase відкрийте `Project Settings` -> `Database` і скористайтесь reset database password.
+`SUPABASE_SERVICE_ROLE_KEY` має повний серверний доступ і обходить RLS. Зберігайте його тільки в backend `.env` або serverless secrets. Не додавайте його у frontend, мобільний застосунок, публічний репозиторій або Swagger приклади.
 
 ## .env
 
@@ -82,8 +72,8 @@ postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
 PORT=3000
 NODE_ENV=development
 
-DATABASE_URL=postgresql://postgres.project-ref:yourDatabasePassword@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
-POSTGRES_SSL=true
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=yourSupabaseServiceRoleKey
 
 JWT_ACCESS_SECRET=yourStrongAccessTokenSecret
 ACCESS_TOKEN_EXPIRES_IN=1d
@@ -91,14 +81,14 @@ ACCESS_TOKEN_EXPIRES_IN=1d
 
 Змінні:
 
-- `DATABASE_URL` - повний connection URL до PostgreSQL/Supabase. Береться в Supabase Dashboard у `Project Settings` -> `Database` -> `Connection string`.
-- `POSTGRES_SSL` - для Supabase залишайте `true`. Для локальної PostgreSQL без SSL можна поставити `false`.
+- `SUPABASE_URL` - URL Supabase проєкту. Береться в `Project Settings` -> `API` -> `Project URL`.
+- `SUPABASE_SERVICE_ROLE_KEY` - серверний ключ Supabase. Береться в `Project Settings` -> `API` -> `Project API keys` -> `service_role`.
 - `JWT_ACCESS_SECRET` - секрет для підпису access token. Задайте довгий випадковий рядок.
 - `ACCESS_TOKEN_EXPIRES_IN` - строк життя access token, за замовчуванням `1d`.
 - `PORT` - порт локального сервера, за замовчуванням `3000`.
 - `NODE_ENV` - режим запуску.
 
-MongoDB змінні більше не використовуються.
+`DATABASE_URL`, `POSTGRES_SSL` і MongoDB змінні більше не використовуються.
 
 ## Створення таблиць у Supabase
 
@@ -112,6 +102,8 @@ MongoDB змінні більше не використовуються.
 - `cars`
 - потрібні індекси
 - extension `pgcrypto` для `gen_random_uuid()`
+
+Після цього сервер працює з цими таблицями через Supabase SDK. Окремий PostgreSQL connection string для застосунку не потрібен.
 
 ## Запуск локально
 
@@ -202,8 +194,8 @@ export AWS_PROFILE=yourProfileName
 
 Перед деплоєм переконайтесь, що production environment variables доступні для Lambda:
 
-- `DATABASE_URL`
-- `POSTGRES_SSL=true`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 - `JWT_ACCESS_SECRET`
 - `ACCESS_TOKEN_EXPIRES_IN`
 
@@ -229,12 +221,12 @@ npm run deploy
 ```text
 src/
   controllers/   HTTP controllers
-  database/      PostgreSQL pool, SQL schema і TypeScript data types
+  database/      Supabase client, SQL schema і TypeScript data types
   docs/          Swagger/OpenAPI конфіг
   helpers/       константи та допоміжні функції
   middlewares/   auth, logger, error handler
   routes/        Express routers
-  services/      бізнес-логіка та SQL-запити
+  services/      бізнес-логіка та Supabase SDK-запити
   utils/         env, pagination, query parsing
   validations/   celebrate/Joi schemas
 ```
