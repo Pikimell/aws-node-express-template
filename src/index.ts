@@ -1,6 +1,7 @@
 import express from "express";
 import serverless from "serverless-http";
 import cors from "cors";
+import { errors } from "celebrate";
 
 import { printRoutes } from "./helpers/printRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
@@ -25,6 +26,7 @@ app.get("/docs.json", (_req, res) => {
 
 app.use(router);
 
+app.use(errors());
 app.use(errorHandler);
 
 printRoutes(app);

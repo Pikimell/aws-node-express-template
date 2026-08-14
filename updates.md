@@ -5,3 +5,5 @@
 (2026-08-14) - Прибрали MongoDB, авторизацію, моделі, сервіси, контролери та валідації (refactor: remove database and auth layers)
 (2026-08-14) - Додали OpenAI SDK та POST endpoint для ChatGPT запитів (feat: add openai chat completion endpoint)
 (2026-08-14) - Оновили env приклад для OpenAI конфігурації (docs: update openai env example)
+(2026-08-14) - Додали celebrate валідацію body для OpenAI chat endpoint (feat: add openai request validation)
+(2026-08-14) - Деталізували OpenAI моделі та повідомлення помилок у валідації (feat: detail openai request schema)

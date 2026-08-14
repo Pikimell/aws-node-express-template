@@ -6,6 +6,7 @@ TypeScript API на Express для запуску локально як звич
 
 - Express API з TypeScript та ESM-модулями.
 - POST endpoint для OpenAI Chat Completions.
+- Валідація body для OpenAI запитів через `celebrate`/`Joi`.
 - Health endpoint для перевірки стану сервера.
 - Swagger UI на `/docs` і OpenAPI JSON на `/docs.json`.
 - Обгортка `serverless-http` для запуску Express у AWS Lambda.
@@ -15,6 +16,48 @@ TypeScript API на Express для запуску локально як звич
 
 - `GET /health` - перевірка стану API.
 - `POST /openai/chat/completions` - запит до OpenAI ChatGPT API.
+
+## OpenAI Request Body
+
+`POST /openai/chat/completions` приймає JSON body:
+
+- `model` - обов'язковий рядок з назвою моделі.
+- `messages` - обов'язковий непорожній масив повідомлень.
+- `messages[].role` - `system`, `developer`, `user` або `assistant`.
+- `messages[].content` - обов'язковий непорожній текст.
+- `temperature` - необов'язкове число від `0` до `2`.
+- `maxTokens` - необов'язкове ціле число більше `0`.
+
+Підтримувані моделі для цього endpoint:
+
+```text
+gpt-5.1
+gpt-5
+gpt-5-mini
+gpt-5-nano
+gpt-5-chat-latest
+gpt-4.1
+gpt-4.1-mini
+gpt-4.1-nano
+o4-mini
+o3
+o3-mini
+o1
+o1-mini
+o1-preview
+gpt-4o
+gpt-4o-mini
+gpt-4-turbo
+gpt-4
+gpt-3.5-turbo
+```
+
+Можливі помилки:
+
+- `400` - body не пройшов `celebrate` валідацію: немає `model` або `messages`, неправильний `role`, порожній `content`, некоректний `temperature` чи `maxTokens`.
+- `401` - `OPENAI_API_KEY` відсутній або недійсний.
+- `429` - перевищено rate limit або квоту OpenAI.
+- `500` - неочікувана помилка сервера або OpenAI API.
 
 ## Необхідні налаштування
 
@@ -138,4 +181,5 @@ src/
   routes/        Express routers
   services/      OpenAI SDK integration
   utils/         env helpers
+  validations/   celebrate/Joi schemas
 ```

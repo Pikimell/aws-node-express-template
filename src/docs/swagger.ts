@@ -1,5 +1,7 @@
 import swaggerJSDoc from "swagger-jsdoc";
 
+import { openAiChatModels, openAiChatMessageRoles } from "../validations/openai.js";
+
 const swaggerDefinition = {
   openapi: "3.0.0",
   info: {
@@ -28,17 +30,19 @@ const swaggerDefinition = {
                 properties: {
                   model: {
                     type: "string",
-                    example: "gpt-4o-mini",
+                    enum: openAiChatModels,
+                    example: "gpt-5-mini",
                   },
                   messages: {
                     type: "array",
+                    minItems: 1,
                     items: {
                       type: "object",
                       required: ["role", "content"],
                       properties: {
                         role: {
                           type: "string",
-                          enum: ["system", "developer", "user", "assistant"],
+                          enum: openAiChatMessageRoles,
                           example: "user",
                         },
                         content: {
@@ -50,10 +54,13 @@ const swaggerDefinition = {
                   },
                   temperature: {
                     type: "number",
+                    minimum: 0,
+                    maximum: 2,
                     example: 0.7,
                   },
                   maxTokens: {
-                    type: "number",
+                    type: "integer",
+                    minimum: 1,
                     example: 500,
                   },
                 },
@@ -81,7 +88,17 @@ const swaggerDefinition = {
             },
           },
           400: {
-            description: "Некоректне тіло запиту",
+            description:
+              "Некоректне тіло запиту: відсутній model/messages, неправильна role, порожній content або некоректні temperature/maxTokens.",
+          },
+          401: {
+            description: "OPENAI_API_KEY відсутній або недійсний.",
+          },
+          429: {
+            description: "Перевищено rate limit або квоту OpenAI.",
+          },
+          500: {
+            description: "Неочікувана помилка сервера або OpenAI API.",
           },
         },
       },
