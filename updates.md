@@ -2,3 +2,6 @@
 (2026-08-08) - Оновили README українським описом API та налаштувань запуску (docs: update project readme)
 (2026-08-08) - Додали модель cars з CRUD сервісами, контролерами, валідаціями та роутами (feat: add cars crud)
 (2026-08-08) - Додали приклади агрегованих запитів для cars статистики (feat: add cars aggregation examples)
+(2026-08-14) - Прибрали MongoDB, авторизацію, моделі, сервіси, контролери та валідації (refactor: remove database and auth layers)
+(2026-08-14) - Додали OpenAI SDK та POST endpoint для ChatGPT запитів (feat: add openai chat completion endpoint)
+(2026-08-14) - Оновили env приклад для OpenAI конфігурації (docs: update openai env example)

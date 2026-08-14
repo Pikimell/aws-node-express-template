@@ -3,9 +3,9 @@ import swaggerJSDoc from "swagger-jsdoc";
 const swaggerDefinition = {
   openapi: "3.0.0",
   info: {
-    title: "Auth API",
+    title: "AWS Node Express Template API",
     version: "1.0.0",
-    description: "API для керування реєстрацією, логіном і сесіями користувачів.",
+    description: "Express API для виконання запитів до OpenAI без авторизації та бази даних.",
   },
   servers: [
     {
@@ -13,170 +13,96 @@ const swaggerDefinition = {
       description: "Локальний або продакшн сервер",
     },
   ],
-  components: {
-    securitySchemes: {
-      bearerAuth: {
-        type: "http",
-        scheme: "bearer",
-        bearerFormat: "JWT",
-      },
-    },
-    schemas: {
-      RegisterInput: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-          password: { type: "string" },
-          nickname: { type: "string" },
-          role: { type: "string", enum: ["user", "admin"] },
-        },
-        required: ["email", "password"],
-      },
-      LoginInput: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-          password: { type: "string" },
-        },
-        required: ["email", "password"],
-      },
-      TokensResponse: {
-        type: "object",
-        properties: {
-          accessToken: { type: "string" },
-          refreshToken: { type: "string" },
-        },
-      },
-      LogoutResponse: {
-        type: "object",
-        properties: {
-          message: { type: "string" },
-        },
-      },
-      UserResponse: {
-        type: "object",
-        properties: {
-          user: {
-            type: "object",
-            properties: {
-              _id: { type: "string" },
-              email: { type: "string" },
-              nickname: { type: "string" },
-              role: { type: "string" },
-              createdAt: { type: "string", format: "date-time" },
-              updatedAt: { type: "string", format: "date-time" },
-            },
-          },
-        },
-      },
-    },
-  },
   paths: {
-    "/auth/register": {
+    "/openai/chat/completions": {
       post: {
-        tags: ["Auth"],
-        summary: "Реєстрація нового користувача",
+        tags: ["OpenAI"],
+        summary: "Створити ChatGPT completion",
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: {
-                $ref: "#/components/schemas/RegisterInput",
-              },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Користувач зареєстрований",
-          },
-        },
-      },
-    },
-    "/auth/login": {
-      post: {
-        tags: ["Auth"],
-        summary: "Отримати access/refresh токени",
-        description: "Сервер записує accessToken та refreshToken у HTTP-only cookie.",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                $ref: "#/components/schemas/LoginInput",
-              },
-            },
-          },
-        },
-        responses: {
-          "200": {
-            description: "Токени повернені у тілі та кукі",
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/TokensResponse",
+                type: "object",
+                required: ["model", "messages"],
+                properties: {
+                  model: {
+                    type: "string",
+                    example: "gpt-4o-mini",
+                  },
+                  messages: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["role", "content"],
+                      properties: {
+                        role: {
+                          type: "string",
+                          enum: ["system", "developer", "user", "assistant"],
+                          example: "user",
+                        },
+                        content: {
+                          type: "string",
+                          example: "Привіт! Поясни TypeScript generics простими словами.",
+                        },
+                      },
+                    },
+                  },
+                  temperature: {
+                    type: "number",
+                    example: 0.7,
+                  },
+                  maxTokens: {
+                    type: "number",
+                    example: 500,
+                  },
                 },
               },
             },
           },
         },
-      },
-    },
-    "/auth/logout": {
-      post: {
-        tags: ["Auth"],
-        summary: "Вийти (видалити сесію)",
         responses: {
-          "200": {
-            description: "Сесія завершена",
+          200: {
+            description: "Відповідь OpenAI",
             content: {
               "application/json": {
                 schema: {
-                  $ref: "#/components/schemas/LogoutResponse",
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "object",
+                    },
+                    completion: {
+                      type: "object",
+                    },
+                  },
                 },
               },
             },
           },
-        },
-      },
-    },
-    "/auth/refresh": {
-      post: {
-        tags: ["Auth"],
-        summary: "Оновити accessToken",
-        description: "Потрібен refreshToken у HTTP-only cookie.",
-        responses: {
-          "200": {
-            description: "Нові токени",
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/TokensResponse",
-                },
-              },
-            },
+          400: {
+            description: "Некоректне тіло запиту",
           },
         },
       },
     },
-    "/auth/me": {
+    "/health": {
       get: {
-        tags: ["Auth"],
-        summary: "Інформація про поточного користувача",
-        security: [{ bearerAuth: [] }],
+        tags: ["System"],
+        summary: "Перевірка стану API",
         responses: {
-          "200": {
-            description: "Дані користувача",
+          200: {
+            description: "API працює",
             content: {
               "application/json": {
                 schema: {
-                  $ref: "#/components/schemas/UserResponse",
+                  type: "object",
+                  properties: {
+                    status: { type: "string", example: "ok" },
+                  },
                 },
               },
             },
-          },
-          "401": {
-            description: "Токен не надано або недійсний",
           },
         },
       },

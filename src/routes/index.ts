@@ -1,12 +1,12 @@
 import { Router } from "express";
-import authRouter from "./auth.js";
-import carsRouter from "./cars.js";
-import newsRouter from "./news.js";
+import openaiRouter from "./openai.js";
 
 const router = Router();
 
-router.use("/auth", authRouter);
-router.use("/cars", carsRouter);
-router.use("/news", newsRouter);
+router.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+router.use("/openai", openaiRouter);
 
 export default router;
