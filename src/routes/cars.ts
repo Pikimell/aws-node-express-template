@@ -14,42 +14,42 @@ import {
 const router = Router();
 
 router.post(
-  '/',
+  '/cars',
   celebrate(createCarSchema),
   ctrlWrapper(carsControllers.createCarController),
 );
 router.get(
-  '/',
+  '/cars',
   celebrate(getCarsSchema),
   ctrlWrapper(carsControllers.getAllCarsController),
 );
 router.get(
-  '/stats/by-make',
+  '/cars/stats/by-make',
   celebrate(getCarsAggregationSchema),
   ctrlWrapper(carsControllers.getCarsStatsByMakeController),
 );
 router.get(
-  '/stats/by-year',
+  '/cars/stats/by-year',
   celebrate(getCarsAggregationSchema),
   ctrlWrapper(carsControllers.getCarsStatsByYearController),
 );
 router.get(
-  '/stats/summary',
+  '/cars/stats/summary',
   celebrate(getCarsAggregationSchema),
   ctrlWrapper(carsControllers.getCarsSummaryController),
 );
 router.get(
-  '/:carId',
+  '/cars/:carId',
   celebrate(getCarByIdSchema),
   ctrlWrapper(carsControllers.getCarByIdController),
 );
 router.patch(
-  '/:carId',
+  '/cars/:carId',
   celebrate(updateCarSchema),
   ctrlWrapper(carsControllers.updateCarController),
 );
 router.delete(
-  '/:carId',
+  '/cars/:carId',
   celebrate(deleteCarSchema),
   ctrlWrapper(carsControllers.deleteCarController),
 );

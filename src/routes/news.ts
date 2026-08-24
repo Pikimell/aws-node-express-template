@@ -11,17 +11,17 @@ import {
 const router = Router();
 
 router.post(
-  '/',
+  '/news',
   celebrate(createNewsSchema),
   ctrlWrapper(newsControllers.createNewsController),
 );
 router.get(
-  '/',
+  '/news',
   celebrate(getNewsSchema),
   ctrlWrapper(newsControllers.getAllNewsController),
 );
 router.delete(
-  '/:newsId',
+  '/news/:newsId',
   celebrate(deleteNewsSchema),
   ctrlWrapper(newsControllers.deleteNewsController),
 );
