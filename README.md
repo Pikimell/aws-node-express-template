@@ -1,5 +1,7 @@
 # AWS Node Express Template
 
+> A production-oriented starting point for authenticated TypeScript APIs that can run locally or on AWS Lambda.
+
 TypeScript API на Express для запуску локально як звичайний HTTP-сервер і для деплою в AWS Lambda через Serverless Framework. Проєкт працює з MongoDB через Mongoose, має JWT-автентифікацію, HTTP-only cookie для токенів, сесії з refresh token, CRUD-операції для новин і Swagger-документацію.
 
 ## Що реалізовано
