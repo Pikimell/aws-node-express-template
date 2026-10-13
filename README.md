@@ -2,6 +2,13 @@
 
 > A production-oriented starting point for authenticated TypeScript APIs that can run locally or on AWS Lambda.
 
+![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
+![AWS Lambda](https://img.shields.io/badge/AWS_Lambda-FF9900?logo=awslambda&logoColor=white)
+![Swagger](https://img.shields.io/badge/OpenAPI-85EA2D?logo=swagger&logoColor=black)
+
 The template combines Express, TypeScript, ESM, MongoDB/Mongoose, JWT authentication, HTTP-only cookies, refresh-token sessions, request validation, CRUD routes, Swagger/OpenAPI, and Serverless Framework deployment.
 
 ## Features
@@ -39,3 +46,7 @@ Configure an AWS profile and run `npm run deploy`. The current Serverless config
 - `npm run deploy` — build and deploy with Serverless Framework.
 
 Ukrainian documentation: [README-uk.md](README-uk.md).
+
+## Author
+
+**Volodymyr Pashchenko**, Full-stack Developer · [GitHub](https://github.com/Pikimell) · [LinkedIn](https://www.linkedin.com/in/pashchenko-v-r)

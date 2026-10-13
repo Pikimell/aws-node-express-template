@@ -1,4 +1,5 @@
 node_modules
 .serverless
 .env
-dist
+dist.DS_Store
+*.tsbuildinfo

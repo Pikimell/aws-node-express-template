@@ -2,3 +2,5 @@
 (2026-08-08) - Оновили README українським описом API та налаштувань запуску (docs: update project readme)
 (2026-08-08) - Додали модель cars з CRUD сервісами, контролерами, валідаціями та роутами (feat: add cars crud)
 (2026-08-08) - Додали приклади агрегованих запитів для cars статистики (feat: add cars aggregation examples)
+
+(2026-10-13) - Оновили README: опис проєкту, стек, архітектура та запуск англійською для роботодавців (docs: rewrite README for portfolio presentation)
